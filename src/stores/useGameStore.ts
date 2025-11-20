@@ -5,6 +5,8 @@ interface PlayerState {
     id: string
     position: [number, number, number]
     rotation: [number, number, number]
+    isMoving?: boolean
+    isRunning?: boolean
     characterIndex: number
 }
 

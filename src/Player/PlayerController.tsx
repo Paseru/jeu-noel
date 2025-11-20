@@ -146,9 +146,22 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
 
         // Socket Update
         if (socket) {
+            // Calculate rotation to send
+            let rotationToSend = [0, 0, 0]
+            if (cameraMode === 'THIRD' && characterRef.current) {
+                // In 3rd person, send the character's rotation
+                const euler = new THREE.Euler().setFromQuaternion(characterRef.current.quaternion)
+                rotationToSend = [euler.x, euler.y, euler.z]
+            } else {
+                // In 1st person, send camera rotation (mostly Y matters for other players)
+                rotationToSend = [0, camera.rotation.y, 0]
+            }
+
             socket.emit('playerMove', {
                 position: [translation.x, translation.y, translation.z],
-                rotation: [camera.rotation.x, camera.rotation.y, camera.rotation.z]
+                rotation: rotationToSend,
+                isMoving: moving,
+                isRunning: run
             })
         }
 

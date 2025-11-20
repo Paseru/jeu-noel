@@ -35,6 +35,8 @@ export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
                             key={player.id}
                             position={player.position}
                             rotation={player.rotation}
+                            isMoving={player.isMoving}
+                            isRunning={player.isRunning}
                             characterIndex={player.characterIndex}
                         />
                     )
