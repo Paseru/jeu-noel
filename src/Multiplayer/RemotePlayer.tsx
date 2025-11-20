@@ -1,28 +1,28 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Vector3 } from 'three'
+import * as THREE from 'three'
 import CharacterModel from '../Player/CharacterModel'
 
 interface RemotePlayerProps {
     position: [number, number, number]
-    rotation: [number, number, number]
+    quaternion: [number, number, number, number]
     isMoving?: boolean
     isRunning?: boolean
     characterIndex?: number
 }
 
-export default function RemotePlayer({ position, rotation, isMoving = false, isRunning = false, characterIndex = 1 }: RemotePlayerProps) {
+export default function RemotePlayer({ position, quaternion, isMoving = false, isRunning = false, characterIndex = 1 }: RemotePlayerProps) {
     const group = useRef<any>()
 
     useFrame((_state, delta) => {
         if (group.current) {
             // Interpolate position for smoothness
-            const targetPos = new Vector3(...position)
-            group.current.position.lerp(targetPos, delta * 10)
+            const targetPos = new THREE.Vector3(...position)
+            group.current.position.lerp(targetPos, delta * 15)
 
-            // Apply rotation directly (Y-axis is most important)
-            // We receive Euler angles [0, y, 0]
-            group.current.rotation.set(0, rotation[1], 0)
+            // Interpolate rotation (Slerp)
+            const targetQuat = new THREE.Quaternion(...quaternion)
+            group.current.quaternion.slerp(targetQuat, delta * 15)
         }
     })
 

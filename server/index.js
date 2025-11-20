@@ -17,7 +17,7 @@ io.on("connection", (socket) => {
     players[socket.id] = {
         id: socket.id,
         position: [0, 0, 0],
-        rotation: [0, 0, 0],
+        quaternion: [0, 0, 0, 1],
         isMoving: false,
         isRunning: false,
         characterIndex: 1, // Default
@@ -46,14 +46,14 @@ io.on("connection", (socket) => {
     socket.on("playerMove", (data) => {
         if (players[socket.id]) {
             players[socket.id].position = data.position;
-            players[socket.id].rotation = data.rotation;
+            players[socket.id].quaternion = data.quaternion;
             players[socket.id].isMoving = data.isMoving;
             players[socket.id].isRunning = data.isRunning;
 
             socket.broadcast.emit("playerMoved", {
                 id: socket.id,
                 position: data.position,
-                rotation: data.rotation,
+                quaternion: data.quaternion,
                 isMoving: data.isMoving,
                 isRunning: data.isRunning,
                 characterIndex: players[socket.id].characterIndex

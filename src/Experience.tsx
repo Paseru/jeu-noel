@@ -34,7 +34,7 @@ export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
                         <RemotePlayer
                             key={player.id}
                             position={player.position}
-                            rotation={player.rotation}
+                            quaternion={player.quaternion}
                             isMoving={player.isMoving}
                             isRunning={player.isRunning}
                             characterIndex={player.characterIndex}

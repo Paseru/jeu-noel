@@ -4,7 +4,7 @@ import { io, Socket } from 'socket.io-client'
 interface PlayerState {
     id: string
     position: [number, number, number]
-    rotation: [number, number, number]
+    quaternion: [number, number, number, number]
     isMoving?: boolean
     isRunning?: boolean
     characterIndex: number
@@ -19,7 +19,7 @@ interface GameState {
 
     startPlaying: () => void
     connectSocket: () => void
-    updatePlayer: (id: string, position: [number, number, number], rotation: [number, number, number]) => void
+    updatePlayer: (id: string, position: [number, number, number], quaternion: [number, number, number, number]) => void
     addPlayer: (player: PlayerState) => void
     removePlayer: (id: string) => void
     setPlayers: (players: Record<string, PlayerState>) => void
@@ -57,13 +57,19 @@ export const useGameStore = create<GameState>((set, get) => ({
             }))
         })
 
-        socket.on('playerMoved', ({ id, position, rotation }) => {
+        socket.on('playerMoved', ({ id, position, quaternion, isMoving, isRunning }) => {
             set((state) => {
                 if (!state.players[id]) return state
                 return {
                     players: {
                         ...state.players,
-                        [id]: { ...state.players[id], position, rotation }
+                        [id]: {
+                            ...state.players[id],
+                            position,
+                            quaternion,
+                            isMoving,
+                            isRunning
+                        }
                     }
                 }
             })
@@ -86,7 +92,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         set({ socket })
     },
 
-    updatePlayer: (_id, _position, _rotation) => {
+    updatePlayer: (_id, _position, _quaternion) => {
         // This is for local updates if needed, but mostly handled by socket events
     },
 

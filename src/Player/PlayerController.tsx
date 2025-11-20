@@ -147,25 +147,28 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             }
         }
 
-        // Socket Update (Throttled to ~15Hz)
+        // Socket Update (Throttled to ~30Hz)
         const now = Date.now()
-        if (socket && now - lastEmitTime.current > 60) { // ~15 updates per second
+        if (socket && now - lastEmitTime.current > 30) { // ~30 updates per second
             lastEmitTime.current = now
 
-            // Calculate rotation to send
-            let rotationToSend = [0, 0, 0]
+            // Calculate rotation to send (Quaternion)
+            let quaternionToSend = [0, 0, 0, 1]
             if (cameraMode === 'THIRD' && characterRef.current) {
-                // In 3rd person, send the character's rotation
-                const euler = new THREE.Euler().setFromQuaternion(characterRef.current.quaternion)
-                rotationToSend = [0, euler.y, 0] // Only send Y rotation
+                // In 3rd person, send the character's quaternion directly
+                const q = characterRef.current.quaternion
+                quaternionToSend = [q.x, q.y, q.z, q.w]
             } else {
-                // In 1st person, send camera rotation (mostly Y matters for other players)
-                rotationToSend = [0, camera.rotation.y, 0]
+                // In 1st person, send camera rotation (mostly Y matters)
+                // Construct a quaternion from camera Y rotation to avoid tilting
+                const q = new THREE.Quaternion()
+                q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y)
+                quaternionToSend = [q.x, q.y, q.z, q.w]
             }
 
             socket.emit('playerMove', {
                 position: [translation.x, translation.y, translation.z],
-                rotation: rotationToSend,
+                quaternion: quaternionToSend,
                 isMoving: moving,
                 isRunning: run
             })
