@@ -106,7 +106,7 @@ export default function App() {
                 <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
                     <div className="bg-[#1c1c2e] border border-white/10 p-8 rounded-2xl w-96 shadow-2xl">
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold text-white">Paramètres</h2>
+                            <h2 className="text-2xl font-bold text-white">Settings</h2>
                             <button
                                 onClick={() => setIsSettingsOpen(false)}
                                 className="text-white/50 hover:text-white transition-colors"
@@ -121,7 +121,7 @@ export default function App() {
                             {/* Volume Control */}
                             <div>
                                 <div className="flex justify-between text-white mb-2">
-                                    <span className="text-sm font-medium">Musique</span>
+                                    <span className="text-sm font-medium">Music</span>
                                     <span className="text-sm text-white/50">{Math.round(volume * 100)}%</span>
                                 </div>
                                 <input
@@ -137,22 +137,22 @@ export default function App() {
 
                             {/* Controls Guide */}
                             <div className="pt-6 border-t border-white/10">
-                                <h3 className="text-white font-bold mb-4 text-lg">Commandes</h3>
+                                <h3 className="text-white font-bold mb-4 text-lg">Controls</h3>
                                 <div className="space-y-3 text-sm text-white/80">
                                     <div className="flex justify-between items-center">
-                                        <span>Se déplacer</span>
-                                        <span className="font-mono text-xs bg-white/10 px-2 py-1 rounded text-white/70">ZQSD / Arrows</span>
+                                        <span>Move</span>
+                                        <span className="font-mono text-xs bg-white/10 px-2 py-1 rounded text-white/70">WASD / Arrows</span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                        <span>Courir</span>
+                                        <span>Run</span>
                                         <span className="font-mono text-xs bg-white/10 px-2 py-1 rounded text-white/70">Shift</span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                        <span>Sauter</span>
+                                        <span>Jump</span>
                                         <span className="font-mono text-xs bg-white/10 px-2 py-1 rounded text-white/70">Space</span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                        <span>Parler (Maintenir)</span>
+                                        <span>Talk (Hold)</span>
                                         <span className="font-mono text-xs bg-white/10 px-2 py-1 rounded text-white/70">V</span>
                                     </div>
                                     <div className="flex justify-between items-center">
@@ -160,7 +160,7 @@ export default function App() {
                                         <span className="font-mono text-xs bg-white/10 px-2 py-1 rounded text-white/70">Enter</span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                        <span>Changer de vue</span>
+                                        <span>Change View</span>
                                         <span className="font-mono text-xs bg-white/10 px-2 py-1 rounded text-white/70">C</span>
                                     </div>
                                 </div>

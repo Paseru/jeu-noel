@@ -6,6 +6,7 @@ interface MainMenuProps {
 
 export default function MainMenu({ onOpenSettings }: MainMenuProps) {
     const startPlaying = useGameStore((state) => state.startPlaying)
+    const nickname = useGameStore((state) => state.nickname)
 
     return (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -22,23 +23,24 @@ export default function MainMenu({ onOpenSettings }: MainMenuProps) {
                 <div className="relative">
                     <input
                         type="text"
-                        placeholder="PSEUDO"
+                        placeholder="NICKNAME"
                         maxLength={15}
+                        value={nickname}
                         className="w-full px-8 py-4 bg-white/10 text-white font-bold text-xl rounded-full border border-white/20 focus:border-white focus:bg-white/20 outline-none transition-all text-center placeholder:text-white/30"
                         onChange={(e) => useGameStore.getState().setNickname(e.target.value)}
                     />
                 </div>
 
                 <button
+                    disabled={!nickname.trim()}
                     onClick={() => {
-                        const nickname = useGameStore.getState().nickname
                         if (nickname.trim().length > 0) {
                             startPlaying()
                         }
                     }}
-                    className="group relative px-8 py-4 bg-white text-black font-bold text-xl rounded-full hover:scale-105 transition-all duration-300 shadow-[0_0_40px_rgba(255,255,255,0.3)] hover:shadow-[0_0_60px_rgba(255,255,255,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="group relative px-8 py-4 bg-white text-black font-bold text-xl rounded-full hover:scale-105 transition-all duration-300 shadow-[0_0_40px_rgba(255,255,255,0.3)] hover:shadow-[0_0_60px_rgba(255,255,255,0.5)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none"
                 >
-                    <span className="relative z-10">JOUER</span>
+                    <span className="relative z-10">PLAY</span>
                     <div className="absolute inset-0 rounded-full bg-white blur-md opacity-50 group-hover:opacity-80 transition-opacity" />
                 </button>
 
@@ -46,7 +48,7 @@ export default function MainMenu({ onOpenSettings }: MainMenuProps) {
                     onClick={onOpenSettings}
                     className="px-8 py-4 bg-white/10 text-white font-bold text-xl rounded-full hover:bg-white/20 backdrop-blur-md border border-white/10 transition-all duration-300 hover:scale-105"
                 >
-                    PARAMÈTRES
+                    SETTINGS
                 </button>
             </div>
 

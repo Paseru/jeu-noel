@@ -4,14 +4,26 @@ import * as THREE from 'three'
 import CharacterModel from '../Player/CharacterModel'
 
 interface RemotePlayerProps {
+    id: string
     position: [number, number, number]
     quaternion: [number, number, number, number]
     isMoving?: boolean
     isRunning?: boolean
     characterIndex?: number
+    nickname?: string
+    isSpeaking?: boolean
 }
 
-export default function RemotePlayer({ position, quaternion, isMoving = false, isRunning = false, characterIndex = 1 }: RemotePlayerProps) {
+export default function RemotePlayer({
+    id,
+    position,
+    quaternion,
+    isMoving = false,
+    isRunning = false,
+    characterIndex = 1,
+    nickname,
+    isSpeaking
+}: RemotePlayerProps) {
     const group = useRef<any>()
 
     useFrame((_state, delta) => {
@@ -34,6 +46,9 @@ export default function RemotePlayer({ position, quaternion, isMoving = false, i
                     characterIndex={characterIndex}
                     isMoving={isMoving}
                     isRunning={isRunning}
+                    nickname={nickname}
+                    isSpeaking={isSpeaking}
+                    playerId={id}
                 />
             </group>
         </group>

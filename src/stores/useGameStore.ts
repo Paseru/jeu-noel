@@ -46,7 +46,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     players: {},
     messages: [],
     playerId: null,
-    nickname: 'Player',
+    nickname: '',
 
     setNickname: (name) => set({ nickname: name }),
     setSpeaking: (isSpeaking) => {
