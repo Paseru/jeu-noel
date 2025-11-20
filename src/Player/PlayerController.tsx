@@ -7,7 +7,7 @@ import { CapsuleCollider, RigidBody, RapierRigidBody, useRapier } from '@react-t
 
 const SPEED = 3.2
 const RUN_SPEED = 6
-const JUMP_FORCE = 8
+const JUMP_FORCE = 6
 
 import CharacterModel from './CharacterModel'
 
@@ -45,6 +45,15 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             socket.emit('initPlayer', { characterIndex: characterIndex.current })
         }
     }, [socket])
+
+    // Audio Listener (The "Ears" of the player)
+    useEffect(() => {
+        const listener = new THREE.AudioListener()
+        camera.add(listener)
+        return () => {
+            camera.remove(listener)
+        }
+    }, [camera])
 
     // Toggle View
     useEffect(() => {
@@ -103,7 +112,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             const bobOffset = moving ? Math.sin(bobState.current) * 0.1 : 0
 
             // First person: Camera matches player position
-            camera.position.set(translation.x, translation.y + 0.8 + bobOffset, translation.z)
+            camera.position.set(translation.x, translation.y + 1.1 + bobOffset, translation.z)
         } else {
             // Third Person Camera (Orbit)
             // 1. Get the camera's current rotation (controlled by PointerLockControls)
@@ -147,9 +156,9 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             }
         }
 
-        // Socket Update (Throttled to ~30Hz)
+        // Socket Update (Throttled to ~120Hz)
         const now = Date.now()
-        if (socket && now - lastEmitTime.current > 30) { // ~30 updates per second
+        if (socket && now - lastEmitTime.current > 8) { // ~120 updates per second
             lastEmitTime.current = now
 
             // Calculate rotation to send (Quaternion)
@@ -159,10 +168,17 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
                 const q = characterRef.current.quaternion
                 quaternionToSend = [q.x, q.y, q.z, q.w]
             } else {
-                // In 1st person, send camera rotation (mostly Y matters)
-                // Construct a quaternion from camera Y rotation to avoid tilting
+                // In 1st person, use Camera Direction (Forward Vector)
+                // This avoids Gimbal Lock and Euler angle flipping issues
+                const direction = new THREE.Vector3()
+                camera.getWorldDirection(direction)
+                direction.y = 0 // Flatten to XZ plane
+                direction.normalize()
+
+                const angle = Math.atan2(direction.x, direction.z)
                 const q = new THREE.Quaternion()
-                q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y)
+                q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle)
+
                 quaternionToSend = [q.x, q.y, q.z, q.w]
             }
 
