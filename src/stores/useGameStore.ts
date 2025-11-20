@@ -9,6 +9,7 @@ interface PlayerState {
     isRunning?: boolean
     nickname: string
     isSpeaking?: boolean
+    characterIndex: number
 }
 
 interface ChatMessage {

@@ -11,7 +11,7 @@ export default function MainMenu({ onOpenSettings }: MainMenuProps) {
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
             <div className="text-center mb-12">
                 <h1 className="text-8xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60 drop-shadow-2xl">
-                    NOËL RÉALISTE
+                    Frozen Hollow
                 </h1>
                 <p className="text-white/60 text-xl font-mono tracking-[0.5em] mt-4 uppercase">
                     Multiplayer Experience

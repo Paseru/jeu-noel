@@ -93,7 +93,7 @@ export default function App() {
                         {/* Top Right: Title */}
                         <div className="text-right">
                             <h1 className="text-4xl font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60 drop-shadow-lg">
-                                NOËL RÉALISTE
+                                Frozen Hollow
                             </h1>
                             <p className="text-white/50 text-sm font-mono tracking-widest mt-1">Pre-Alpha Build</p>
                         </div>

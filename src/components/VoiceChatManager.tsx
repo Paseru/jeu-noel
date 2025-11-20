@@ -131,15 +131,15 @@ export default function VoiceChatManager() {
             stream,
         })
 
-        peer.on('signal', (signal) => {
+        peer.on('signal', (signal: any) => {
             socket.emit('signal', { target: targetId, signal })
         })
 
-        peer.on('stream', (remoteStream) => {
+        peer.on('stream', (remoteStream: MediaStream) => {
             addRemoteStream(targetId, remoteStream)
         })
 
-        peer.on('error', (err) => {
+        peer.on('error', (err: Error) => {
             console.error('Peer error:', err)
         })
 

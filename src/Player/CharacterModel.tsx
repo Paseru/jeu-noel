@@ -1,8 +1,8 @@
-import { useRef, useEffect, useMemo, useState } from 'react'
+import { useRef, useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF, useAnimations, Html } from '@react-three/drei'
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
-import { Group, AudioListener, PositionalAudio as ThreePositionalAudio } from 'three'
+import { Group, PositionalAudio as ThreePositionalAudio } from 'three'
 import { useVoiceStore } from '../stores/useVoiceStore'
 
 interface CharacterModelProps {
@@ -32,7 +32,6 @@ export default function CharacterModel({
     // Audio
     const remoteStreams = useVoiceStore((state) => state.remoteStreams)
     const audioRef = useRef<ThreePositionalAudio>(null!)
-    const [listener] = useState(() => new AudioListener())
 
     useEffect(() => {
         if (playerId && remoteStreams[playerId] && audioRef.current) {
