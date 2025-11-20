@@ -1,4 +1,3 @@
-import { PointerLockControls } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 import { PlayerController } from './Player/PlayerController'
 import { Lights } from './World/Lights'
@@ -10,12 +9,11 @@ import { useGameStore } from './stores/useGameStore'
 import RemotePlayer from './Multiplayer/RemotePlayer'
 
 export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
-    const { players, socket, phase } = useGameStore()
+    const { players, playerId } = useGameStore()
 
     return (
         <>
             {/* Controls: Only active if settings are CLOSED and we are PLAYING */}
-            {!isSettingsOpen && phase === 'PLAYING' && <PointerLockControls />}
 
             {/* <MiniMap /> */}
 
@@ -27,11 +25,11 @@ export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
                 <Environment />
                 <Snow />
                 <Map />
-                <PlayerController />
+                <PlayerController isSettingsOpen={isSettingsOpen} />
 
                 {/* Remote Players */}
                 {Object.values(players).map((player) => {
-                    if (socket && player.id === socket.id) return null
+                    if (playerId && player.id === playerId) return null
                     return (
                         <RemotePlayer
                             key={player.id}

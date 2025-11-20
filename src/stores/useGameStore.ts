@@ -13,6 +13,8 @@ interface GameState {
     socket: Socket | null
     players: Record<string, PlayerState>
 
+    playerId: string | null
+
     startPlaying: () => void
     connectSocket: () => void
     updatePlayer: (id: string, position: [number, number, number], rotation: [number, number, number]) => void
@@ -25,6 +27,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     phase: 'MENU',
     socket: null,
     players: {},
+    playerId: null,
 
     startPlaying: () => {
         set({ phase: 'PLAYING' })
@@ -39,6 +42,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
         socket.on('connect', () => {
             console.log('Connected to server:', serverUrl)
+            set({ playerId: socket.id })
         })
 
         socket.on('currentPlayers', (players) => {
