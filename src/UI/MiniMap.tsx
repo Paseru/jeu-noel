@@ -1,6 +1,6 @@
-import { useFrame, useThree, createPortal } from '@react-three/fiber'
-import { useRef, useState } from 'react'
-import { OrthographicCamera, Hud, RenderTexture, PerspectiveCamera, Environment } from '@react-three/drei'
+import { useFrame, useThree } from '@react-three/fiber'
+import { useRef } from 'react'
+import { OrthographicCamera, Hud, RenderTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import { Map } from '../World/Map' // We need to render the map inside the texture too
 

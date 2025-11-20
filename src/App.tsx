@@ -13,6 +13,7 @@ export default function App() {
         { name: 'right', keys: ['ArrowRight', 'KeyD'] },
         { name: 'jump', keys: ['Space'] },
         { name: 'run', keys: ['Shift'] },
+        { name: 'toggleView', keys: ['KeyC'] },
     ], [])
 
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)

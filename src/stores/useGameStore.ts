@@ -5,6 +5,7 @@ interface PlayerState {
     id: string
     position: [number, number, number]
     rotation: [number, number, number]
+    characterIndex: number
 }
 
 interface GameState {
@@ -62,6 +63,12 @@ export const useGameStore = create<GameState>((set, get) => ({
             })
         })
 
+        socket.on('updatePlayerState', (player) => {
+            set((state) => ({
+                players: { ...state.players, [player.id]: player }
+            }))
+        })
+
         socket.on('playerDisconnected', (id) => {
             set((state) => {
                 const newPlayers = { ...state.players }
@@ -73,7 +80,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         set({ socket })
     },
 
-    updatePlayer: (id, position, rotation) => {
+    updatePlayer: (_id, _position, _rotation) => {
         // This is for local updates if needed, but mostly handled by socket events
     },
 

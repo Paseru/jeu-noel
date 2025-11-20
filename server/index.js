@@ -16,6 +16,7 @@ io.on("connection", (socket) => {
         id: socket.id,
         position: [0, 0, 0],
         rotation: [0, 0, 0],
+        characterIndex: 1, // Default
     };
 
     // Send current players to the new player
@@ -23,6 +24,19 @@ io.on("connection", (socket) => {
 
     // Broadcast new player to everyone else
     socket.broadcast.emit("newPlayer", players[socket.id]);
+
+    // Handle player initialization (character choice)
+    socket.on("initPlayer", (data) => {
+        if (players[socket.id]) {
+            players[socket.id].characterIndex = data.characterIndex;
+            // Broadcast the update so everyone knows this player's character
+            io.emit("playerMoved", players[socket.id]); // Re-using playerMoved or create new event?
+            // Better to emit a specific update or just rely on newPlayer if it happens early.
+            // But initPlayer might happen after connection.
+            // Let's emit a full update for this player.
+            io.emit("updatePlayerState", players[socket.id]);
+        }
+    });
 
     // Handle player movement
     socket.on("playerMove", (data) => {
@@ -33,6 +47,7 @@ io.on("connection", (socket) => {
                 id: socket.id,
                 position: data.position,
                 rotation: data.rotation,
+                characterIndex: players[socket.id].characterIndex
             });
         }
     });

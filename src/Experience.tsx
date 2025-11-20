@@ -6,7 +6,6 @@ import { Environment } from './World/Environment'
 import { Map } from './World/Map'
 import { Snow } from './World/Snow'
 
-import { MiniMap } from './UI/MiniMap'
 import { useGameStore } from './stores/useGameStore'
 import RemotePlayer from './Multiplayer/RemotePlayer'
 
@@ -38,6 +37,7 @@ export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
                             key={player.id}
                             position={player.position}
                             rotation={player.rotation}
+                            characterIndex={player.characterIndex}
                         />
                     )
                 })}
