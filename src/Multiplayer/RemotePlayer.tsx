@@ -21,8 +21,8 @@ export default function RemotePlayer({ position, rotation, isMoving = false, isR
             group.current.position.lerp(targetPos, delta * 10)
 
             // Apply rotation directly (Y-axis is most important)
-            // We receive Euler angles [x, y, z]
-            group.current.rotation.set(...rotation)
+            // We receive Euler angles [0, y, 0]
+            group.current.rotation.set(0, rotation[1], 0)
         }
     })
 

@@ -31,6 +31,9 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     // Random character index (1-5)
     const characterIndex = useRef(1)
 
+    // Network throttling
+    const lastEmitTime = useRef(0)
+
     // Camera Mode
     const [cameraMode, setCameraMode] = useState<'FIRST' | 'THIRD'>('FIRST')
     const [isMoving, setIsMoving] = useState(false)
@@ -144,14 +147,17 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             }
         }
 
-        // Socket Update
-        if (socket) {
+        // Socket Update (Throttled to ~15Hz)
+        const now = Date.now()
+        if (socket && now - lastEmitTime.current > 60) { // ~15 updates per second
+            lastEmitTime.current = now
+
             // Calculate rotation to send
             let rotationToSend = [0, 0, 0]
             if (cameraMode === 'THIRD' && characterRef.current) {
                 // In 3rd person, send the character's rotation
                 const euler = new THREE.Euler().setFromQuaternion(characterRef.current.quaternion)
-                rotationToSend = [euler.x, euler.y, euler.z]
+                rotationToSend = [0, euler.y, 0] // Only send Y rotation
             } else {
                 // In 1st person, send camera rotation (mostly Y matters for other players)
                 rotationToSend = [0, camera.rotation.y, 0]
