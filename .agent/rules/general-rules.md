@@ -8,3 +8,6 @@ trigger: always_on
 - Tu as besoin d'exemples concrets d'implémentation
 - Tu cherches des solutions à une erreur spécifique
 - Tu veux vérifier les meilleures pratiques actuelles (post-janvier 2025)
+
+
+# Langue de l'application TOUT en anglais
