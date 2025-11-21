@@ -62,7 +62,7 @@ export default function CharacterModel({
             sound.setMediaStreamSource(stream)
             sound.setRefDistance(1) // Start dropping volume immediately
             sound.setMaxDistance(25) // Completely silent at 25 meters
-            sound.setRolloffFactor(1)
+            sound.setRolloffFactor(0) // Disable automatic attenuation, we'll do it manually
             sound.setDistanceModel('linear') // Linear falloff for clear proximity effect
             sound.setVolume(1)
         } else {
@@ -113,6 +113,23 @@ export default function CharacterModel({
     const [isNameplateVisible, setIsNameplateVisible] = useState(true)
 
     useFrame((state) => {
+        // Manual Proximity Volume Calculation
+        if (group.current && audioRef.current && playerId) {
+            const cameraPos = state.camera.position
+            const characterPos = new THREE.Vector3()
+            group.current.getWorldPosition(characterPos)
+
+            const distance = cameraPos.distanceTo(characterPos)
+            const maxDistance = 25
+
+            // Linear falloff: 1 at 0m, 0 at 25m
+            let volume = Math.max(0, 1 - distance / maxDistance)
+
+            // Apply volume to the PositionalAudio object
+            // This sets the gain of the source, preserving stereo panning from the PannerNode
+            audioRef.current.setVolume(volume)
+        }
+
         // Procedural Animation Fallback (if no animations found)
         if (animations.length === 0 && group.current) {
             if (isMoving) {
