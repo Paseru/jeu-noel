@@ -22,7 +22,7 @@ export default function App() {
     ], [])
 
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-    const [volume, setVolume] = useState(0.05)
+    const [volume, setVolume] = useState(0.01)
     const audioRef = useRef<HTMLAudioElement>(null)
 
     const { phase } = useGameStore()

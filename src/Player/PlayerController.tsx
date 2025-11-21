@@ -30,7 +30,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     const bobState = useRef(0)
 
     // Random character index (1-5)
-    const characterIndex = useRef(1)
+    const characterIndex = useRef(Math.floor(Math.random() * 5) + 1)
 
     // Network throttling
     const lastEmitTime = useRef(0)
@@ -113,7 +113,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
 
         // Apply Camera Rotation from Touch
         if (lookDelta.x !== 0 || lookDelta.y !== 0) {
-            const SENSITIVITY = 0.002
+            const SENSITIVITY = 0.015 // Increased from 0.002 for faster mobile look
             camera.rotation.y -= lookDelta.x * SENSITIVITY
             // Clamp pitch? For now just simple yaw/pitch
             // Actually, PointerLockControls usually handles this.
@@ -244,7 +244,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             colliders={false}
             mass={1}
             type="dynamic"
-            position={[0, 10, 0]}
+            position={[0, 10, -1]}
             enabledRotations={[false, false, false]}
             friction={0}
         >

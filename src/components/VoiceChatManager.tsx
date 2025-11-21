@@ -76,45 +76,57 @@ export default function VoiceChatManager() {
         }
     }, [setSpeaking])
 
-    // Socket Events for WebRTC
+    // Socket Events for WebRTC - Stable Listeners
     useEffect(() => {
         if (!socket || !playerId || !localStreamRef.current) return
 
         // Handle incoming signals
-        socket.on('signal', ({ sender, signal }) => {
+        const handleSignal = ({ sender, signal }: { sender: string, signal: any }) => {
             const peer = peersRef.current[sender]
             if (peer) {
                 peer.signal(signal)
             } else {
                 // Incoming connection (Answerer)
-                // We only accept signals if we didn't initiate (or if we lost the race but that shouldn't happen with deterministic logic)
                 const newPeer = createPeer(sender, socket, localStreamRef.current!, false)
                 peersRef.current[sender] = newPeer
                 newPeer.signal(signal)
             }
-        })
+        }
 
         // Handle new player (Initiator)
-        socket.on('newPlayer', (player) => {
+        const handleNewPlayer = (player: any) => {
             if (player.id === playerId) return
             // Deterministic initiation: Only initiate if my ID is "greater" than theirs
-            // This prevents double-initiation collisions
             if (!peersRef.current[player.id] && playerId > player.id) {
                 const peer = createPeer(player.id, socket, localStreamRef.current!, true)
                 peersRef.current[player.id] = peer
             }
-        })
+        }
 
         // Handle player disconnected
-        socket.on('playerDisconnected', (id) => {
+        const handlePlayerDisconnected = (id: string) => {
             if (peersRef.current[id]) {
                 peersRef.current[id].destroy()
                 delete peersRef.current[id]
                 removeRemoteStream(id)
             }
-        })
+        }
 
-        // Connect to existing players
+        socket.on('signal', handleSignal)
+        socket.on('newPlayer', handleNewPlayer)
+        socket.on('playerDisconnected', handlePlayerDisconnected)
+
+        return () => {
+            socket.off('signal', handleSignal)
+            socket.off('newPlayer', handleNewPlayer)
+            socket.off('playerDisconnected', handlePlayerDisconnected)
+        }
+    }, [socket, playerId, removeRemoteStream]) // Removed 'players' dependency
+
+    // Connection Maintenance - Dynamic (Checks for missing connections)
+    useEffect(() => {
+        if (!socket || !playerId || !localStreamRef.current) return
+
         Object.keys(players).forEach((id) => {
             if (id !== playerId && !peersRef.current[id]) {
                 // Same deterministic logic
@@ -124,13 +136,7 @@ export default function VoiceChatManager() {
                 }
             }
         })
-
-        return () => {
-            socket.off('signal')
-            socket.off('newPlayer')
-            socket.off('playerDisconnected')
-        }
-    }, [socket, playerId, players, removeRemoteStream])
+    }, [players, playerId, socket])
 
     function createPeer(targetId: string, socket: any, stream: MediaStream, initiator: boolean) {
         const peer = new SimplePeer({

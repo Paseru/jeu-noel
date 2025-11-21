@@ -118,19 +118,19 @@ export default function CharacterModel({
             {/* Nameplate - Only visible when playing AND showNameplate is true */}
             {phase === 'PLAYING' && showNameplate && (
                 <Html position={[0, 2.2, 0]} center distanceFactor={10} zIndexRange={[0, 10]}>
-                    <div className="flex flex-col items-center">
-                        {isSpeaking && (
-                            <div className="mb-1 bg-white/20 backdrop-blur-sm p-1 rounded-full animate-pulse">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-green-400">
-                                    <path d="M8.25 4.5a3.75 3.75 0 117.5 0v8.25a3.75 3.75 0 11-7.5 0V4.5z" />
-                                    <path d="M6 10.5a.75.75 0 01.75.75v1.5a5.25 5.25 0 1010.5 0v-1.5a.75.75 0 011.5 0v1.5a6.751 6.751 0 01-6 6.709v2.291h3a.75.75 0 010 1.5h-7.5a.75.75 0 010-1.5h3v-2.291a6.751 6.751 0 01-6-6.709v-1.5A.75.75 0 016 10.5z" />
-                                </svg>
-                            </div>
-                        )}
-                        <div className="bg-black/50 backdrop-blur-md px-3 py-1 rounded-full border border-white/10">
+                    <div className="flex items-center justify-center">
+                        <div className="bg-black/50 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-2">
                             <span className="text-white font-bold text-xs whitespace-nowrap shadow-sm">
                                 {nickname}
                             </span>
+                            {isSpeaking && (
+                                <div className="bg-white/20 p-0.5 rounded-full animate-pulse">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 text-green-400">
+                                        <path d="M8.25 4.5a3.75 3.75 0 117.5 0v8.25a3.75 3.75 0 11-7.5 0V4.5z" />
+                                        <path d="M6 10.5a.75.75 0 01.75.75v1.5a5.25 5.25 0 1010.5 0v-1.5a.75.75 0 011.5 0v1.5a6.751 6.751 0 01-6 6.709v2.291h3a.75.75 0 010 1.5h-7.5a.75.75 0 010-1.5h3v-2.291a6.751 6.751 0 01-6-6.709v-1.5A.75.75 0 016 10.5z" />
+                                    </svg>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </Html>

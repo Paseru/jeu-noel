@@ -79,7 +79,12 @@ export default function MobileControls() {
     return (
         <div className="fixed inset-0 z-50 pointer-events-none flex select-none touch-none block md:hidden">
             {/* Left Side: Joystick Zone */}
-            <div className="absolute bottom-8 left-8 w-48 h-48 pointer-events-auto">
+            <div
+                className="absolute left-8 w-48 h-48 pointer-events-auto"
+                style={{
+                    bottom: 'max(2rem, env(safe-area-inset-bottom))'
+                }}
+            >
                 <div
                     ref={joystickRef}
                     className="w-full h-full rounded-full bg-white/10 backdrop-blur-sm border border-white/20 relative flex items-center justify-center"

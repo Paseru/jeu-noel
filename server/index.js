@@ -16,7 +16,7 @@ io.on("connection", (socket) => {
     // Add new player
     players[socket.id] = {
         id: socket.id,
-        position: [0, 0, 0],
+        position: [0, 0, -1],
         quaternion: [0, 0, 0, 1],
         isMoving: false,
         isRunning: false,

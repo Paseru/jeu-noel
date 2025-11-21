@@ -30,6 +30,8 @@ export default function Chat() {
                     // Close chat (blur input)
                     setChatOpen(false)
                     inputRef.current?.blur()
+                    // Re-lock pointer to return to game
+                    document.querySelector('canvas')?.requestPointerLock()
                 } else {
                     // Open chat (focus input)
                     setChatOpen(true)
@@ -40,6 +42,8 @@ export default function Chat() {
                 if (isChatOpen) {
                     setChatOpen(false)
                     inputRef.current?.blur()
+                    // Re-lock pointer to return to game
+                    document.querySelector('canvas')?.requestPointerLock()
                 }
             }
         }
