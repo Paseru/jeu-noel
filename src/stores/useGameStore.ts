@@ -285,5 +285,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         const { [id]: _, ...rest } = state.players
         return { players: rest }
     }),
-    setPlayers: (players) => set({ players })
+    setPlayers: (players) => set({ players }),
+
+    // Interaction System
+    interactionText: null,
+    setInteractionText: (text) => set({ interactionText: text })
 }))
