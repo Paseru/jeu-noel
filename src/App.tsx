@@ -27,7 +27,7 @@ export default function App() {
     const [isPauseMenuOpen, setIsPauseMenuOpen] = useState(false)
     const audioRef = useRef<HTMLAudioElement>(null)
 
-    const { phase, setPhase, volumes } = useGameStore()
+    const { phase, volumes } = useGameStore()
 
     useEffect(() => {
         if (audioRef.current) {
