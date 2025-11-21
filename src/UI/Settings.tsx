@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+
 
 interface SettingsProps {
     isOpen: boolean
