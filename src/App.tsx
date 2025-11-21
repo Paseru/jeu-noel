@@ -38,15 +38,25 @@ export default function App() {
     }, [volume])
 
     // Play on first interaction if autoplay was blocked
+    const audioListener = useVoiceStore((state) => state.audioListener)
+
+    // Play on first interaction if autoplay was blocked
     useEffect(() => {
         const handleInteraction = () => {
             if (audioRef.current && audioRef.current.paused) {
                 audioRef.current.play()
             }
+            if (audioListener && audioListener.context.state === 'suspended') {
+                audioListener.context.resume()
+            }
         }
         window.addEventListener('click', handleInteraction)
-        return () => window.removeEventListener('click', handleInteraction)
-    }, [])
+        window.addEventListener('keydown', handleInteraction)
+        return () => {
+            window.removeEventListener('click', handleInteraction)
+            window.removeEventListener('keydown', handleInteraction)
+        }
+    }, [audioListener])
 
     return (
         <KeyboardControls map={map}>

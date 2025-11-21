@@ -9,17 +9,17 @@ export default function MainMenu({ onOpenSettings }: MainMenuProps) {
     const nickname = useGameStore((state) => state.nickname)
 
     return (
-        <div className="absolute inset-0 z-[1000] flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
-            <div className="text-center mb-12">
-                <h1 className="text-8xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60 drop-shadow-2xl">
+        <div className="absolute inset-0 z-[1000] flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm overflow-hidden">
+            <div className="text-center mb-12 landscape:mb-4 landscape:scale-75 origin-bottom transition-transform">
+                <h1 className="text-8xl landscape:text-6xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60 drop-shadow-2xl">
                     Frozen Hollow
                 </h1>
-                <p className="text-white/60 text-xl font-mono tracking-[0.5em] mt-4 uppercase">
+                <p className="text-white/60 text-xl landscape:text-lg font-mono tracking-[0.5em] mt-4 uppercase">
                     Multiplayer Experience
                 </p>
             </div>
 
-            <div className="flex flex-col gap-6 w-80">
+            <div className="flex flex-col gap-6 w-80 landscape:scale-75 origin-top transition-transform">
                 <div className="relative">
                     <input
                         type="text"
@@ -52,7 +52,7 @@ export default function MainMenu({ onOpenSettings }: MainMenuProps) {
                 </button>
             </div>
 
-            <div className="absolute bottom-8 text-white/30 text-sm font-mono">
+            <div className="absolute bottom-8 landscape:bottom-2 text-white/30 text-sm font-mono">
                 v0.1.0 • PRE-ALPHA
             </div>
         </div>

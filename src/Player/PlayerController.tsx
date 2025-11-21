@@ -29,8 +29,8 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     // Head bobbing state
     const bobState = useRef(0)
 
-    // Random character index (1-5)
-    const characterIndex = useRef(Math.floor(Math.random() * 5) + 1)
+    // Character Index from Server
+    const characterIndex = useGameStore((state) => state.myCharacterIndex)
 
     // Network throttling
     const lastEmitTime = useRef(0)
@@ -40,10 +40,11 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     const [isMoving, setIsMoving] = useState(false)
     const [isRunning, setIsRunning] = useState(false)
 
-    // Initialize player on server
+    // Initialize player on server (Nickname only)
     useEffect(() => {
         if (socket) {
-            socket.emit('initPlayer', { characterIndex: characterIndex.current })
+            // We don't send characterIndex anymore, server assigns it
+            socket.emit('initPlayer', { nickname: useGameStore.getState().nickname })
         }
     }, [socket])
 
@@ -134,7 +135,48 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
         // Head Bobbing (Only in First Person)
         if (cameraMode === 'FIRST') {
             if (moving) {
+                const previousBob = bobState.current
                 bobState.current += delta * (run ? 15 : 10)
+
+                // Detect step (when sine wave hits bottom)
+                // We check if we crossed the "bottom" of the sine wave (-1) or simply if we completed a half cycle
+                // A full cycle is 2PI. Steps happen twice per cycle (left foot, right foot)? 
+                // Actually, usually bobbing is 1 cycle = 2 steps or 1 cycle = 1 step depending on implementation.
+                // Here: sin(bobState). 
+                // Let's say step happens when sin goes from positive to negative (downward motion) or reaches minimum.
+                // Simplest: Check if we crossed PI or 2PI boundaries?
+                // Or just check if Math.sin(previous) > threshold and Math.sin(current) < threshold.
+
+                // Let's trigger sound when the camera is at its lowest point (impact).
+                // Lowest point is when sin(x) = -1. (3PI/2 + 2kPI)
+
+                // We can just check if the cycle crossed the "bottom" point.
+                // The cycle is continuous.
+                // Let's use a simple threshold check on the sine value derivative or phase.
+
+                // Phase check:
+                const cycle = Math.PI * 2
+                const prevPhase = previousBob % cycle
+                const currentPhase = bobState.current % cycle
+
+                // Peak is PI/2, Bottom is 3PI/2 (approx 4.71)
+                // If we crossed 4.71, play sound.
+                // BUT, people have two feet. So maybe we want 2 steps per cycle?
+                // If so, we want bottom (-1) AND top (1)? No, usually bobbing is up/down for each step.
+                // If the bobbing formula is simple sin(t), then one full wave = 1 up/down motion = 1 step?
+                // Or is it left-right-left-right?
+                // Usually head bobs DOWN on every foot impact.
+                // So 1 cycle of sin = 1 step.
+
+                // Let's assume 1 cycle = 1 step for now.
+                // Trigger at bottom (3PI/2)
+                if (prevPhase < 4.71 && currentPhase >= 4.71) {
+                    const randomIdx = Math.floor(Math.random() * 3) + 1
+                    const audio = new Audio(`/sounds/steps/${randomIdx}.mp3`)
+                    audio.volume = 0.3 // Not too loud
+                    audio.play().catch(() => { }) // Ignore autoplay errors
+                }
+
             } else {
                 bobState.current = 0
             }
@@ -259,7 +301,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             {cameraMode === 'THIRD' && (
                 <group ref={characterRef} position={[0, -0.8, 0]}> {/* Adjust height to match collider */}
                     <CharacterModel
-                        characterIndex={characterIndex.current}
+                        characterIndex={characterIndex}
                         isMoving={isMoving}
                         isRunning={isRunning}
                         showNameplate={false}

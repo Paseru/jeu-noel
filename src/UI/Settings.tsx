@@ -11,9 +11,9 @@ export default function Settings({ isOpen, onClose, volume, setVolume }: Setting
     if (!isOpen) return null
 
     return (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="bg-black/40 backdrop-blur-md border border-white/10 p-8 rounded-3xl w-96 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex justify-between items-center mb-8">
+        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-black/40 backdrop-blur-md border border-white/10 p-8 landscape:p-4 rounded-3xl w-96 max-h-[90vh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center mb-8 landscape:mb-4">
                     <h2 className="text-3xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60">
                         SETTINGS
                     </h2>
@@ -27,10 +27,10 @@ export default function Settings({ isOpen, onClose, volume, setVolume }: Setting
                     </button>
                 </div>
 
-                <div className="space-y-8">
+                <div className="space-y-8 landscape:space-y-4">
                     {/* Volume Control */}
                     <div>
-                        <div className="flex justify-between text-white mb-4">
+                        <div className="flex justify-between text-white mb-4 landscape:mb-2">
                             <span className="text-sm font-bold tracking-wider text-white/70 uppercase">Music Volume</span>
                             <span className="text-sm font-mono text-white/50">{Math.round(volume * 100)}%</span>
                         </div>
@@ -46,9 +46,9 @@ export default function Settings({ isOpen, onClose, volume, setVolume }: Setting
                     </div>
 
                     {/* Controls Guide */}
-                    <div className="pt-8 border-t border-white/10">
-                        <h3 className="text-sm font-bold tracking-wider text-white/70 uppercase mb-6">Controls</h3>
-                        <div className="space-y-3">
+                    <div className="pt-8 landscape:pt-4 border-t border-white/10">
+                        <h3 className="text-sm font-bold tracking-wider text-white/70 uppercase mb-6 landscape:mb-3">Controls</h3>
+                        <div className="space-y-3 landscape:space-y-2">
                             <ControlRow label="Move" keys={['WASD', 'Arrows']} />
                             <ControlRow label="Run" keys={['Shift']} />
                             <ControlRow label="Jump" keys={['Space']} />

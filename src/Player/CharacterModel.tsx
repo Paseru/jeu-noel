@@ -1,8 +1,9 @@
-import { useRef, useEffect, useMemo } from 'react'
+import { useRef, useEffect, useMemo, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF, useAnimations, Html } from '@react-three/drei'
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { Group, PositionalAudio as ThreePositionalAudio } from 'three'
+import * as THREE from 'three'
 import { useVoiceStore } from '../stores/useVoiceStore'
 import { useGameStore } from '../stores/useGameStore'
 
@@ -42,9 +43,13 @@ export default function CharacterModel({
             const sound = audioRef.current
             const stream = remoteStreams[playerId]
 
-            // Create a source from the stream
-            // Note: In R3F/Three, we usually attach the listener to the camera
-            // But for PositionalAudio to work with MediaStream, we need to set the source
+            // Create a hidden audio element to ensure the browser plays the stream
+            // This is often required for WebRTC audio to work with Web Audio API
+            const audioEl = new Audio()
+            audioEl.srcObject = stream
+            audioEl.muted = true // Mute it because we want the 3D audio, not the flat audio
+            audioEl.play().catch(e => console.error("Error playing hidden audio:", e))
+
             if (sound.context.state === 'suspended') {
                 sound.context.resume()
             }
@@ -93,6 +98,9 @@ export default function CharacterModel({
         }
     }, [isMoving, isRunning, actions, animations, characterIndex])
 
+    // Nameplate Visibility Logic
+    const [isNameplateVisible, setIsNameplateVisible] = useState(true)
+
     useFrame((state) => {
         // Procedural Animation Fallback (if no animations found)
         if (animations.length === 0 && group.current) {
@@ -109,14 +117,27 @@ export default function CharacterModel({
                 group.current.rotation.z = 0
             }
         }
+
+        // Distance Check for Nameplate
+        if (group.current) {
+            const cameraPos = state.camera.position
+            const characterPos = group.current.getWorldPosition(new THREE.Vector3())
+            const distance = cameraPos.distanceTo(characterPos)
+
+            // Only update state if it changes to avoid re-renders
+            const shouldBeVisible = distance < 30
+            if (shouldBeVisible !== isNameplateVisible) {
+                setIsNameplateVisible(shouldBeVisible)
+            }
+        }
     })
 
     return (
         <group ref={group} dispose={null}>
             <primitive object={cloneScene} />
 
-            {/* Nameplate - Only visible when playing AND showNameplate is true */}
-            {phase === 'PLAYING' && showNameplate && (
+            {/* Nameplate - Only visible when playing AND showNameplate is true AND within distance */}
+            {phase === 'PLAYING' && showNameplate && isNameplateVisible && (
                 <Html position={[0, 2.2, 0]} center distanceFactor={10} zIndexRange={[0, 10]}>
                     <div className="flex items-center justify-center">
                         <div className="bg-black/50 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-2">

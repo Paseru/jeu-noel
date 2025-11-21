@@ -41,6 +41,9 @@ interface GameState {
     addLookDelta: (x: number, y: number) => void
     resetLookDelta: () => void
 
+    myCharacterIndex: number
+    setMyCharacterIndex: (index: number) => void
+
     setNickname: (name: string) => void
     setChatOpen: (isOpen: boolean) => void
     setSpeaking: (isSpeaking: boolean) => void
@@ -85,6 +88,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         mobileInput: { ...state.mobileInput, lookDelta: { x: 0, y: 0 } }
     })),
 
+    // My Character Index (Assigned by Server)
+    myCharacterIndex: 1,
+    setMyCharacterIndex: (index) => set({ myCharacterIndex: index }),
+
     setNickname: (name) => set({ nickname: name }),
     setChatOpen: (isOpen) => set({ isChatOpen: isOpen }),
     setSpeaking: (isSpeaking) => {
@@ -116,13 +123,22 @@ export const useGameStore = create<GameState>((set, get) => ({
         })
 
         socket.on('currentPlayers', (players) => {
-            set({ players })
+            set((state) => {
+                if (socket.id && players[socket.id]) {
+                    return { players, myCharacterIndex: players[socket.id].characterIndex }
+                }
+                return { players }
+            })
         })
 
         socket.on('newPlayer', (player) => {
-            set((state) => ({
-                players: { ...state.players, [player.id]: player }
-            }))
+            set((state) => {
+                const newPlayers = { ...state.players, [player.id]: player }
+                if (socket.id === player.id) {
+                    return { players: newPlayers, myCharacterIndex: player.characterIndex }
+                }
+                return { players: newPlayers }
+            })
         })
 
         socket.on('playerMoved', ({ id, position, quaternion, isMoving, isRunning }) => {

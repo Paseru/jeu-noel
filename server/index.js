@@ -9,9 +9,17 @@ const io = new Server(PORT, {
 });
 
 let players = {};
+let nextCharacterIndex = 1; // Start at 1
 
 io.on("connection", (socket) => {
     console.log("New player connected:", socket.id);
+
+    // Assign character index sequentially
+    const assignedCharacterIndex = nextCharacterIndex;
+    nextCharacterIndex++;
+    if (nextCharacterIndex > 5) {
+        nextCharacterIndex = 1;
+    }
 
     // Add new player
     players[socket.id] = {
@@ -20,7 +28,7 @@ io.on("connection", (socket) => {
         quaternion: [0, 0, 0, 1],
         isMoving: false,
         isRunning: false,
-        characterIndex: 1, // Default
+        characterIndex: assignedCharacterIndex, // Assigned by server
         isSpeaking: false,
         nickname: "Player" // Default
     };
@@ -31,16 +39,14 @@ io.on("connection", (socket) => {
     // Broadcast new player to everyone else
     socket.broadcast.emit("newPlayer", players[socket.id]);
 
-    // Handle player initialization (character choice)
+    // Handle player initialization (nickname only now)
     socket.on("initPlayer", (data) => {
         if (players[socket.id]) {
-            players[socket.id].characterIndex = data.characterIndex;
+            // Ignore client sent characterIndex, keep server assigned one
+            // players[socket.id].characterIndex = data.characterIndex; 
             players[socket.id].nickname = data.nickname;
-            // Broadcast the update so everyone knows this player's character
-            io.emit("playerMoved", players[socket.id]); // Re-using playerMoved or create new event?
-            // Better to emit a specific update or just rely on newPlayer if it happens early.
-            // But initPlayer might happen after connection.
-            // Let's emit a full update for this player.
+
+            // Broadcast the update so everyone knows this player's nickname
             io.emit("updatePlayerState", players[socket.id]);
         }
     });
