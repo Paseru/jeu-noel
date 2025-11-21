@@ -68,6 +68,7 @@ interface GameState {
     removePlayer: (id: string) => void
     setPlayers: (players: Record<string, PlayerState>) => void
     sendMessage: (text: string) => void
+    addChatMessage: (message: ChatMessage) => void
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -235,6 +236,10 @@ export const useGameStore = create<GameState>((set, get) => ({
             socket.emit('chatMessage', text)
         }
     },
+
+    addChatMessage: (message: ChatMessage) => set((state) => ({
+        messages: [...state.messages, message]
+    })),
 
     updatePlayer: (_id, _position, _quaternion) => {
         // This is for local updates if needed, but mostly handled by socket events

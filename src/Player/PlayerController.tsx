@@ -9,6 +9,7 @@ import { CapsuleCollider, RigidBody, RapierRigidBody, useRapier } from '@react-t
 const SPEED = 3.2
 const RUN_SPEED = 6
 const JUMP_FORCE = 6
+const FLY_SPEED = 15 // Faster speed for flying
 
 import CharacterModel from './CharacterModel'
 
@@ -17,7 +18,7 @@ interface PlayerControllerProps {
 }
 
 export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
-    const { socket, phase, isChatOpen, mobileInput, resetLookDelta } = useGameStore()
+    const { socket, phase, isChatOpen, mobileInput, resetLookDelta, addChatMessage } = useGameStore()
     const body = useRef<RapierRigidBody>(null!)
     const [subscribeKeys, getKeys] = useKeyboardControls()
     const { camera } = useThree()
@@ -40,6 +41,9 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     const [isMoving, setIsMoving] = useState(false)
     const [isRunning, setIsRunning] = useState(false)
 
+    // Debug / Fly Mode
+    const [flyMode, setFlyMode] = useState(false)
+
     // Initialize player on server (Nickname only)
     useEffect(() => {
         if (socket) {
@@ -61,18 +65,58 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
         }
     }, [camera, setAudioListener])
 
-    // Toggle View
+    // Toggle View & Debug Fly Mode
     useEffect(() => {
         const unsubscribe = subscribeKeys(
-            (state) => state.toggleView,
-            (value) => {
-                if (value && !isChatOpen) {
-                    setCameraMode((prev) => (prev === 'FIRST' ? 'THIRD' : 'FIRST'))
-                }
+            (state) => state,
+            (values) => {
+                // Toggle View (V) handled by subscribeKeys usually, but we can do it here or via event listener
             }
         )
-        return unsubscribe
-    }, [subscribeKeys, isChatOpen])
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (isChatOpen) return
+
+            // Toggle View (V)
+            if (e.code === 'KeyV') {
+                setCameraMode((prev) => (prev === 'FIRST' ? 'THIRD' : 'FIRST'))
+            }
+
+            // Toggle Fly Mode (L)
+            if (e.code === 'KeyL') {
+                setFlyMode((prev) => {
+                    const newState = !prev
+                    const pos = body.current.translation()
+                    const coords = `x: ${pos.x.toFixed(2)}, y: ${pos.y.toFixed(2)}, z: ${pos.z.toFixed(2)}`
+
+                    console.log(`📍 Position: ${coords}`)
+                    // Try to add to chat if function exists
+                    if (addChatMessage) {
+                        addChatMessage({
+                            id: Date.now().toString(),
+                            senderId: 'SYSTEM',
+                            senderName: 'SYSTEM',
+                            text: newState ? `✈️ Fly Mode ON. Pos: ${coords}` : `🚶 Fly Mode OFF. Pos: ${coords}`,
+                            timestamp: Date.now()
+                        })
+                    }
+
+                    // Reset gravity when turning off
+                    if (!newState && body.current) {
+                        body.current.setGravityScale(1, true)
+                    }
+
+                    return newState
+                })
+            }
+        }
+
+        window.addEventListener('keydown', handleKeyDown)
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown)
+            unsubscribe()
+        }
+    }, [subscribeKeys, isChatOpen, addChatMessage])
 
     // Jump Logic
     const lastJumpTime = useRef(0)
@@ -104,22 +148,40 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
         )
         const direction = new THREE.Vector3()
 
-        direction
-            .subVectors(frontVector, sideVector)
-            .normalize()
-            .multiplyScalar(run ? RUN_SPEED : SPEED)
-            .applyEuler(camera.rotation) // Use camera for direction so it's responsive
+        if (flyMode) {
+            // --- FLY MODE LOGIC ---
+            body.current.setGravityScale(0, true)
 
-        body.current.setLinvel({ x: direction.x, y: velocity.y, z: direction.z }, true)
+            // Direction relative to camera
+            direction
+                .subVectors(frontVector, sideVector)
+                .normalize()
+                .multiplyScalar(FLY_SPEED)
+                .applyEuler(camera.rotation)
+
+            // Vertical Movement (Space = Up, Shift/Run = Down)
+            if (jump) direction.y += FLY_SPEED
+            if (run) direction.y -= FLY_SPEED // Using 'run' key (Shift) for down
+
+            // Apply velocity directly
+            body.current.setLinvel({ x: direction.x, y: direction.y, z: direction.z }, true)
+
+        } else {
+            // --- NORMAL WALKING LOGIC ---
+            body.current.setGravityScale(1, true)
+
+            direction
+                .subVectors(frontVector, sideVector)
+                .normalize()
+                .multiplyScalar(run ? RUN_SPEED : SPEED)
+                .applyEuler(camera.rotation) // Use camera for direction so it's responsive
+
+            body.current.setLinvel({ x: direction.x, y: velocity.y, z: direction.z }, true)
+        }
 
         // Apply Camera Rotation from Touch
         if (lookDelta.x !== 0 || lookDelta.y !== 0) {
             const SENSITIVITY = 0.005 // Reduced sensitivity for smoother control
-
-            // Yaw (Y axis) - World Axis
-            // We need to rotate around the world Y axis, but camera.rotation.y is local if parented.
-            // However, camera is usually at root or parented to a non-rotated object in this setup?
-            // Actually, camera.rotation.y is fine for yaw if we use YXZ order.
 
             camera.rotation.order = 'YXZ' // Important for FPS camera to avoid gimbal lock
 
@@ -142,43 +204,17 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
         setIsMoving(moving)
         setIsRunning(run)
 
-        // Head Bobbing (Only in First Person)
+        // Head Bobbing (Only in First Person AND NOT Flying)
         if (cameraMode === 'FIRST') {
-            if (moving) {
+            if (moving && !flyMode) {
                 const previousBob = bobState.current
                 bobState.current += delta * (run ? 15 : 10)
-
-                // Detect step (when sine wave hits bottom)
-                // We check if we crossed the "bottom" of the sine wave (-1) or simply if we completed a half cycle
-                // A full cycle is 2PI. Steps happen twice per cycle (left foot, right foot)? 
-                // Actually, usually bobbing is 1 cycle = 2 steps or 1 cycle = 1 step depending on implementation.
-                // Here: sin(bobState). 
-                // Let's say step happens when sin goes from positive to negative (downward motion) or reaches minimum.
-                // Simplest: Check if we crossed PI or 2PI boundaries?
-                // Or just check if Math.sin(previous) > threshold and Math.sin(current) < threshold.
-
-                // Let's trigger sound when the camera is at its lowest point (impact).
-                // Lowest point is when sin(x) = -1. (3PI/2 + 2kPI)
-
-                // We can just check if the cycle crossed the "bottom" point.
-                // The cycle is continuous.
-                // Let's use a simple threshold check on the sine value derivative or phase.
 
                 // Phase check:
                 const cycle = Math.PI * 2
                 const prevPhase = previousBob % cycle
                 const currentPhase = bobState.current % cycle
 
-                // Peak is PI/2, Bottom is 3PI/2 (approx 4.71)
-                // If we crossed 4.71, play sound.
-                // BUT, people have two feet. So maybe we want 2 steps per cycle?
-                // If so, we want bottom (-1) AND top (1)? No, usually bobbing is up/down for each step.
-                // If the bobbing formula is simple sin(t), then one full wave = 1 up/down motion = 1 step?
-                // Or is it left-right-left-right?
-                // Usually head bobs DOWN on every foot impact.
-                // So 1 cycle of sin = 1 step.
-
-                // Let's assume 1 cycle = 1 step for now.
                 // Trigger at bottom (3PI/2)
                 if (prevPhase < 4.71 && currentPhase >= 4.71) {
                     const randomIdx = Math.floor(Math.random() * 3) + 1
@@ -190,22 +226,16 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             } else {
                 bobState.current = 0
             }
-            const bobOffset = moving ? Math.sin(bobState.current) * 0.1 : 0
+            const bobOffset = (moving && !flyMode) ? Math.sin(bobState.current) * 0.1 : 0
 
             // First person: Camera matches player position
             camera.position.set(translation.x, translation.y + 1 + bobOffset, translation.z)
         } else {
             // Third Person Camera (Orbit)
-            // 1. Get the camera's current rotation (controlled by PointerLockControls)
-            // 2. Calculate the "backward" vector relative to where we are looking
             const cameraDirection = new THREE.Vector3(0, 0, -1)
             cameraDirection.applyQuaternion(camera.quaternion) // Use camera for responsive orbit
             cameraDirection.normalize()
 
-            // 3. Position camera behind the player
-            // Distance: 3 units (Requested)
-            // Height: 1.4 units (Lowered to look more "at" the character)
-            // Offset: 0 unit (Centered)
             const cameraDist = 2
             const cameraHeight = 1.4
             const rightOffset = 0
@@ -218,19 +248,14 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
                 translation.z - cameraDirection.z * cameraDist + rightVector.z * rightOffset
             )
 
-            // Optional: Raycast to prevent camera clipping through walls?
-            // For now, simple lerp
-            camera.position.lerp(targetPos, 0.2) // Slightly faster position follow than rotation to prevent drift
+            camera.position.lerp(targetPos, 0.2)
         }
 
         // Character Rotation (Face movement direction)
         if (cameraMode === 'THIRD' && isMoving) {
             // Calculate angle from velocity
             const angle = Math.atan2(velocity.x, velocity.z)
-            // We need to rotate the character mesh, not the RigidBody (which is locked)
-            // We can use a ref for the character group
             if (characterRef.current) {
-                // Smooth rotation
                 const targetRotation = new THREE.Quaternion()
                 targetRotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle)
                 characterRef.current.quaternion.slerp(targetRotation, 0.2)
@@ -245,12 +270,9 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             // Calculate rotation to send (Quaternion)
             let quaternionToSend = [0, 0, 0, 1]
             if (cameraMode === 'THIRD' && characterRef.current) {
-                // In 3rd person, send the character's quaternion directly
                 const q = characterRef.current.quaternion
                 quaternionToSend = [q.x, q.y, q.z, q.w]
             } else {
-                // In 1st person, use Camera Direction (Forward Vector)
-                // This avoids Gimbal Lock and Euler angle flipping issues
                 const direction = new THREE.Vector3()
                 camera.getWorldDirection(direction)
                 direction.y = 0 // Flatten to XZ plane
@@ -271,8 +293,8 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             })
         }
 
-        // Jump Logic
-        if (jump) {
+        // Jump Logic (Only when NOT flying)
+        if (jump && !flyMode) {
             const now = Date.now()
             if (now - lastJumpTime.current > 1000) { // 1 second cooldown
                 // Simple ground check: raycast down
