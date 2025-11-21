@@ -50,11 +50,7 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
 
                 const name = child.name.toLowerCase()
 
-                // DOOR EXTRACTION (Only for Hospital map)
-                if (modelPath.includes('Hospital') && name.includes('door')) {
-                    doorsToMove.push(child)
-                    return // Skip plant check for doors
-                }
+
 
                 const isPlantOrTree = name.includes('grass') || name.includes('flower') || name.includes('plant') || name.includes('leaf') || name.includes('vegetation') || name.includes('tree') || name.includes('pine') || name.includes('spruce')
                 const isRock = name.includes('rock') || name.includes('stone') || name.includes('cliff') || name.includes('boulder') || name.includes('mountain') || name.includes('ice') || name.includes('log') || name.includes('stump')
