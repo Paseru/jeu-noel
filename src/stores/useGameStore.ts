@@ -32,6 +32,7 @@ interface Room {
     modelPath: string
     maxPlayers: number
     playerCount: number
+    scale?: number
 }
 
 interface GameState {
@@ -59,6 +60,10 @@ interface GameState {
     setNickname: (name: string) => void
     setChatOpen: (isOpen: boolean) => void
     setSpeaking: (isSpeaking: boolean) => void
+
+    // Debug Mode
+    isDebugMode: boolean
+    toggleDebugMode: () => void
 
     // Volume Settings
     volumes: {
@@ -94,7 +99,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     // Default Volumes
     volumes: {
-        music: 0.05, // Default low music
+        music: 0.01, // Default low music
         voice: 1.0,
         sfx: 0.5
     },
@@ -138,6 +143,10 @@ export const useGameStore = create<GameState>((set, get) => ({
             socket.emit('speaking', isSpeaking)
         }
     },
+
+    // Debug Mode
+    isDebugMode: false,
+    toggleDebugMode: () => set((state) => ({ isDebugMode: !state.isDebugMode })),
 
     connectSocket: () => {
         if (get().socket) return

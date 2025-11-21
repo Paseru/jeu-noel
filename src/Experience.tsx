@@ -10,7 +10,7 @@ import { useGameStore } from './stores/useGameStore'
 import RemotePlayer from './Multiplayer/RemotePlayer'
 
 export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
-    const { players, playerId } = useGameStore()
+    const { players, playerId, isDebugMode } = useGameStore()
 
     return (
         <>
@@ -21,7 +21,7 @@ export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
             <ambientLight intensity={0.5} />
             <directionalLight position={[10, 10, 5]} intensity={1} />
 
-            <Physics gravity={[0, -20, 0]}>
+            <Physics gravity={[0, -20, 0]} debug={isDebugMode}>
                 <Lights />
                 <Environment />
                 <Snow />

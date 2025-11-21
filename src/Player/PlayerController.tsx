@@ -77,8 +77,8 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (isChatOpen) return
 
-            // Toggle View (V)
-            if (e.code === 'KeyV') {
+            // Toggle View (C)
+            if (e.code === 'KeyC') {
                 setCameraMode((prev) => (prev === 'FIRST' ? 'THIRD' : 'FIRST'))
             }
 

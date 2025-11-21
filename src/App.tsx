@@ -60,23 +60,35 @@ export default function App() {
         }
     }, [audioListener])
 
-    // Handle Escape key for Pause Menu
+    // Handle Escape key for Pause Menu & Debug Mode (P)
     useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
+        const handleKeyUp = (e: KeyboardEvent) => {
             if (e.code === 'Escape') {
                 if (phase === 'PLAYING') {
+                    // If settings are open, close them
                     if (isSettingsOpen) {
                         setIsSettingsOpen(false)
-                    } else {
-                        setIsPauseMenuOpen(prev => !prev)
+                    }
+                    // If pause menu is open, close it
+                    else if (isPauseMenuOpen) {
+                        setIsPauseMenuOpen(false)
+                    }
+                    // If nothing is open, open pause menu
+                    else {
+                        setIsPauseMenuOpen(true)
                     }
                 }
             }
+
+            // Debug Mode (P)
+            if (e.code === 'KeyP') {
+                useGameStore.getState().toggleDebugMode()
+            }
         }
 
-        window.addEventListener('keydown', handleKeyDown)
-        return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [phase, isSettingsOpen])
+        window.addEventListener('keyup', handleKeyUp)
+        return () => window.removeEventListener('keyup', handleKeyUp)
+    }, [phase, isSettingsOpen, isPauseMenuOpen])
 
     const handleQuit = () => {
         setIsPauseMenuOpen(false)

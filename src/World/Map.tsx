@@ -7,9 +7,12 @@ import { useGameStore } from '../stores/useGameStore'
 export const Map = () => {
     const { currentRoomId, rooms } = useGameStore()
 
-    const modelPath = useMemo(() => {
+    const { modelPath, scale } = useMemo(() => {
         const room = rooms.find(r => r.id === currentRoomId)
-        return room?.modelPath || '/models/snowy_village_ps1_environment.glb'
+        return {
+            modelPath: room?.modelPath || '/models/snowy_village_ps1_environment.glb',
+            scale: room?.scale || 1
+        }
     }, [currentRoomId, rooms])
 
     const { scene } = useGLTF(modelPath)
@@ -104,11 +107,11 @@ export const Map = () => {
         <>
             {/* Solid World (Walls, Floor) - Has Physics */}
             <RigidBody type="fixed" colliders="trimesh">
-                <primitive object={solidScene} />
+                <primitive object={solidScene} scale={scale} />
             </RigidBody>
 
             {/* Plants (Decoration) - No Physics */}
-            <primitive object={plantScene} />
+            <primitive object={plantScene} scale={scale} />
         </>
     )
 }
