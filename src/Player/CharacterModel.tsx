@@ -35,15 +35,15 @@ export default function CharacterModel({
     const { actions } = useAnimations(animations, group)
 
     // Audio
-    const remoteStreams = useVoiceStore((state) => state.remoteStreams)
+    // Select specific stream to avoid re-renders when other players join
+    const stream = useVoiceStore((state) => state.remoteStreams[playerId || ''])
     const audioListener = useVoiceStore((state) => state.audioListener)
     const audioRef = useRef<ThreePositionalAudio>(null!)
 
     useEffect(() => {
-        if (playerId && remoteStreams[playerId] && audioRef.current) {
+        if (playerId && stream && audioRef.current) {
             console.log(`[CharacterModel] Attaching audio for ${playerId}`)
             const sound = audioRef.current
-            const stream = remoteStreams[playerId]
 
             // Create a hidden audio element to ensure the browser plays the stream
             // This is often required for WebRTC audio to work with Web Audio API
@@ -62,15 +62,21 @@ export default function CharacterModel({
             sound.setMediaStreamSource(stream)
             sound.setRefDistance(1) // Start dropping volume immediately
             sound.setMaxDistance(25) // Completely silent at 25 meters
-            sound.setRolloffFactor(0) // Disable automatic attenuation, we'll do it manually
+            sound.setRolloffFactor(1) // Enable automatic attenuation
             sound.setDistanceModel('linear') // Linear falloff for clear proximity effect
             sound.setVolume(1)
+
+            return () => {
+                console.log(`[CharacterModel] Cleaning up audio for ${playerId}`)
+                audioEl.pause()
+                audioEl.srcObject = null
+            }
         } else {
-            if (playerId && !remoteStreams[playerId]) {
+            if (playerId && !stream) {
                 console.log(`[CharacterModel] No remote stream for ${playerId}`)
             }
         }
-    }, [playerId, remoteStreams, audioListener])
+    }, [playerId, stream, audioListener])
 
     useEffect(() => {
         // Helper to find animation by name (case insensitive, partial match)
@@ -113,22 +119,9 @@ export default function CharacterModel({
     const [isNameplateVisible, setIsNameplateVisible] = useState(true)
 
     useFrame((state) => {
-        // Manual Proximity Volume Calculation
-        if (group.current && audioRef.current && playerId) {
-            const cameraPos = state.camera.position
-            const characterPos = new THREE.Vector3()
-            group.current.getWorldPosition(characterPos)
-
-            const distance = cameraPos.distanceTo(characterPos)
-            const maxDistance = 25
-
-            // Linear falloff: 1 at 0m, 0 at 25m
-            let volume = Math.max(0, 1 - distance / maxDistance)
-
-            // Apply volume to the PositionalAudio object
-            // This sets the gain of the source, preserving stereo panning from the PannerNode
-            audioRef.current.setVolume(volume)
-        }
+        // Manual Proximity Volume Calculation Removed - Using Native Web Audio Attenuation
+        // The PositionalAudio object handles distance attenuation automatically via PannerNode
+        // when rolloffFactor is > 0.
 
         // Procedural Animation Fallback (if no animations found)
         if (animations.length === 0 && group.current) {
@@ -186,7 +179,7 @@ export default function CharacterModel({
             )}
 
             {/* Positional Audio for Remote Players */}
-            {playerId && remoteStreams[playerId] && audioListener && (
+            {playerId && stream && audioListener && (
                 <positionalAudio ref={audioRef} args={[audioListener]} />
             )}
         </group>
