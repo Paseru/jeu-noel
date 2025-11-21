@@ -9,11 +9,16 @@ export const Map = () => {
 
     const { modelPath, scale } = useMemo(() => {
         const room = rooms.find(r => r.id === currentRoomId)
+        if (!room) return { modelPath: null, scale: 1 }
+
         return {
-            modelPath: room?.modelPath || '/models/snowy_village_ps1_environment.glb',
-            scale: room?.scale || 1
+            modelPath: room.modelPath,
+            scale: room.scale || 1
         }
     }, [currentRoomId, rooms])
+
+    // If no map is selected (e.g. Main Menu), render nothing
+    if (!modelPath) return null
 
     const { scene } = useGLTF(modelPath)
 

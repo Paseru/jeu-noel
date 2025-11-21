@@ -324,7 +324,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             enabledRotations={[false, false, false]}
             friction={0}
         >
-            <CapsuleCollider args={[0.5, 0.3]} />
+            <CapsuleCollider args={[0.5, 0.3]} sensor={flyMode} />
 
             {/* Controls: Only active if settings are CLOSED and we are PLAYING and Chat is CLOSED */}
             {!isSettingsOpen && !isChatOpen && phase === 'PLAYING' && (
