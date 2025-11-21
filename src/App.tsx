@@ -92,7 +92,6 @@ export default function App() {
                 <>
                     <Chat />
                     <VoiceChatManager />
-                    <VoiceChatManager />
                     <VoiceIndicator />
                     <MobileControls />
 
