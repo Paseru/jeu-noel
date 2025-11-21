@@ -1,13 +1,15 @@
 
 
+import { useGameStore } from '../stores/useGameStore'
+
 interface SettingsProps {
     isOpen: boolean
     onClose: () => void
-    volume: number
-    setVolume: (volume: number) => void
 }
 
-export default function Settings({ isOpen, onClose, volume, setVolume }: SettingsProps) {
+export default function Settings({ isOpen, onClose }: SettingsProps) {
+    const { volumes, setVolume } = useGameStore()
+
     if (!isOpen) return null
 
     return (
@@ -28,21 +30,58 @@ export default function Settings({ isOpen, onClose, volume, setVolume }: Setting
                 </div>
 
                 <div className="space-y-8 landscape:space-y-4">
-                    {/* Volume Control */}
-                    <div>
-                        <div className="flex justify-between text-white mb-4 landscape:mb-2">
-                            <span className="text-sm font-bold tracking-wider text-white/70 uppercase">Music Volume</span>
-                            <span className="text-sm font-mono text-white/50">{Math.round(volume * 100)}%</span>
+                    {/* Volume Controls */}
+                    <div className="space-y-6">
+                        {/* Music Volume */}
+                        <div>
+                            <div className="flex justify-between text-white mb-2">
+                                <span className="text-sm font-bold tracking-wider text-white/70 uppercase">Music</span>
+                                <span className="text-sm font-mono text-white/50">{Math.round(volumes.music * 100)}%</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                value={volumes.music}
+                                onChange={(e) => setVolume('music', parseFloat(e.target.value))}
+                                className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white hover:accent-gray-200 transition-all"
+                            />
                         </div>
-                        <input
-                            type="range"
-                            min="0"
-                            max="1"
-                            step="0.01"
-                            value={volume}
-                            onChange={(e) => setVolume(parseFloat(e.target.value))}
-                            className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white hover:accent-gray-200 transition-all"
-                        />
+
+                        {/* Voice Volume */}
+                        <div>
+                            <div className="flex justify-between text-white mb-2">
+                                <span className="text-sm font-bold tracking-wider text-white/70 uppercase">Voice Chat</span>
+                                <span className="text-sm font-mono text-white/50">{Math.round(volumes.voice * 100)}%</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                value={volumes.voice}
+                                onChange={(e) => setVolume('voice', parseFloat(e.target.value))}
+                                className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white hover:accent-gray-200 transition-all"
+                            />
+                        </div>
+
+                        {/* SFX Volume */}
+                        <div>
+                            <div className="flex justify-between text-white mb-2">
+                                <span className="text-sm font-bold tracking-wider text-white/70 uppercase">Game SFX</span>
+                                <span className="text-sm font-mono text-white/50">{Math.round(volumes.sfx * 100)}%</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                value={volumes.sfx}
+                                onChange={(e) => setVolume('sfx', parseFloat(e.target.value))}
+                                className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white hover:accent-gray-200 transition-all"
+                            />
+                        </div>
                     </div>
 
                     {/* Controls Guide */}

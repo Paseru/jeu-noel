@@ -39,6 +39,7 @@ export default function CharacterModel({
     const stream = useVoiceStore((state) => state.remoteStreams[playerId || ''])
     const audioListener = useVoiceStore((state) => state.audioListener)
     const audioRef = useRef<ThreePositionalAudio>(null!)
+    const voiceVolume = useGameStore((state) => state.volumes.voice)
 
     useEffect(() => {
         if (playerId && stream && audioRef.current) {
@@ -64,7 +65,7 @@ export default function CharacterModel({
             sound.setMaxDistance(25) // Completely silent at 25 meters
             sound.setRolloffFactor(1) // Enable automatic attenuation
             sound.setDistanceModel('linear') // Linear falloff for clear proximity effect
-            sound.setVolume(1)
+            sound.setVolume(voiceVolume)
 
             // Cleanup function removed to prevent audio cutting out
             // We rely on the component unmounting to eventually garbage collect the audio element
@@ -79,7 +80,7 @@ export default function CharacterModel({
                 console.log(`[CharacterModel] No remote stream for ${playerId}`)
             }
         }
-    }, [playerId, stream, audioListener])
+    }, [playerId, stream, audioListener, voiceVolume])
 
     useEffect(() => {
         // Helper to find animation by name (case insensitive, partial match)

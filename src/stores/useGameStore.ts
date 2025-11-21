@@ -36,6 +36,7 @@ interface Room {
 
 interface GameState {
     phase: 'MENU' | 'PLAYING'
+    setPhase: (phase: 'MENU' | 'PLAYING') => void
     socket: Socket | null
     players: Record<string, PlayerState>
     messages: ChatMessage[]
@@ -59,6 +60,14 @@ interface GameState {
     setChatOpen: (isOpen: boolean) => void
     setSpeaking: (isSpeaking: boolean) => void
 
+    // Volume Settings
+    volumes: {
+        music: number
+        voice: number
+        sfx: number
+    }
+    setVolume: (type: 'music' | 'voice' | 'sfx', value: number) => void
+
     connectSocket: () => void
     fetchRooms: () => void
     joinRoom: (roomId: string) => void
@@ -73,6 +82,7 @@ interface GameState {
 
 export const useGameStore = create<GameState>((set, get) => ({
     phase: 'MENU',
+    setPhase: (phase) => set({ phase }),
     socket: null,
     players: {},
     messages: [],
@@ -81,6 +91,17 @@ export const useGameStore = create<GameState>((set, get) => ({
     playerId: null,
     nickname: '',
     isChatOpen: false,
+
+    // Default Volumes
+    volumes: {
+        music: 0.05, // Default low music
+        voice: 1.0,
+        sfx: 0.5
+    },
+
+    setVolume: (type, value) => set((state) => ({
+        volumes: { ...state.volumes, [type]: value }
+    })),
 
     mobileInput: {
         joystick: { x: 0, y: 0 },

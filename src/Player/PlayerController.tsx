@@ -69,7 +69,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     useEffect(() => {
         const unsubscribe = subscribeKeys(
             (state) => state,
-            (values) => {
+            (_values) => {
                 // Toggle View (V) handled by subscribeKeys usually, but we can do it here or via event listener
             }
         )
@@ -219,7 +219,9 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
                 if (prevPhase < 4.71 && currentPhase >= 4.71) {
                     const randomIdx = Math.floor(Math.random() * 3) + 1
                     const audio = new Audio(`/sounds/steps/${randomIdx}.mp3`)
-                    audio.volume = 0.3 // Not too loud
+                    // Use SFX volume from store
+                    const sfxVolume = useGameStore.getState().volumes.sfx
+                    audio.volume = 0.3 * sfxVolume // Not too loud
                     audio.play().catch(() => { }) // Ignore autoplay errors
                 }
 
