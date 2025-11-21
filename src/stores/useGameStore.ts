@@ -33,6 +33,7 @@ interface Room {
     maxPlayers: number
     playerCount: number
     scale?: number
+    spawnPoint?: [number, number, number]
 }
 
 interface GameState {

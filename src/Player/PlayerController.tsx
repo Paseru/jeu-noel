@@ -320,7 +320,10 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             colliders={false}
             mass={1}
             type="dynamic"
-            position={[0, 10, -1]}
+            position={(() => {
+                const room = useGameStore.getState().rooms.find(r => r.id === useGameStore.getState().currentRoomId)
+                return room?.spawnPoint || [0, 10, 0]
+            })()}
             enabledRotations={[false, false, false]}
             friction={0}
         >

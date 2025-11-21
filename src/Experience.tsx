@@ -34,14 +34,6 @@ export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
                     <Map />
                 </ErrorBoundary>
 
-                {/* DEBUG: Safety Floor to catch falling player */}
-                <RigidBody type="fixed" position={[0, -10, 0]}>
-                    <mesh receiveShadow>
-                        <boxGeometry args={[100, 1, 100]} />
-                        <meshStandardMaterial color="red" />
-                    </mesh>
-                </RigidBody>
-
                 <PlayerController isSettingsOpen={isSettingsOpen} />
 
                 {/* Remote Players */}

@@ -10,13 +10,47 @@ const io = new Server(PORT, {
 
 // Define available rooms (servers)
 const ROOMS = [
-    { id: "server-1", name: "Snowy Village", mapImage: "/maps/Snowy Village.jpg", modelPath: "/models/snowy_village_ps1_environment.glb", maxPlayers: 20 },
-    { id: "server-2", name: "City Center", mapImage: "/maps/City 1.jpeg", modelPath: "/models/city 1.glb", maxPlayers: 20, scale: 15 },
-    { id: "server-3", name: "The Hood", mapImage: "/maps/Hood.jpeg", modelPath: "/models/compressed_1763758312648_hood.glb", maxPlayers: 20 },
-    { id: "server-4", name: "Subway Station", mapImage: "/maps/Subway.jpg", modelPath: "/models/compressed_1763750890387_Subway.glb", maxPlayers: 20 },
-    { id: "server-5", name: "Santa's Workshop", mapImage: "/maps/Workshop.jpeg", modelPath: "/models/compressed_1763750836374_Workshop.glb", maxPlayers: 20 },
-    { id: "server-6", name: "Jailhouse", mapImage: "/maps/Jailhouse.jpeg", modelPath: "/models/jailhouse_rock.glb", maxPlayers: 20 },
-    { id: "server-7", name: "Abandoned Hospital", mapImage: "/maps/Abandonned Hospital.jpeg", modelPath: "/models/compressed_1763750895660_Abandonned Hospital.glb", maxPlayers: 20 }
+    {
+        id: "server-1",
+        name: "Snowy Village",
+        mapImage: "/maps/Snowy Village.jpg",
+        modelPath: "/models/snowy_village_ps1_environment.glb",
+        maxPlayers: 20,
+        spawnPoint: [-0.19, 0.80, -9.25]
+    },
+    {
+        id: "server-2",
+        name: "City Center",
+        mapImage: "/maps/City 1.jpeg",
+        modelPath: "/models/city 1.glb",
+        maxPlayers: 20,
+        scale: 15,
+        spawnPoint: [61.38, 1.24, 3.61]
+    },
+    {
+        id: "server-3",
+        name: "The Hood",
+        mapImage: "/maps/Hood.jpeg",
+        modelPath: "/models/compressed_1763758312648_hood.glb",
+        maxPlayers: 20,
+        spawnPoint: [-28.14, 0.96, 20.80]
+    },
+    {
+        id: "server-4",
+        name: "Subway Station",
+        mapImage: "/maps/Subway.jpg",
+        modelPath: "/models/compressed_1763750890387_Subway.glb",
+        maxPlayers: 20,
+        spawnPoint: [43.38, 2.08, 12.65]
+    },
+    {
+        id: "server-7",
+        name: "Abandoned Hospital",
+        mapImage: "/maps/Abandonned Hospital.jpeg",
+        modelPath: "/models/compressed_1763750895660_Abandonned Hospital.glb",
+        maxPlayers: 20,
+        spawnPoint: [-51.63, 11.06, 21.05]
+    }
 ];
 
 let players = {}; // { socketId: { ...playerData, roomId } }
