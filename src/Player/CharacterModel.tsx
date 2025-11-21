@@ -36,6 +36,7 @@ export default function CharacterModel({
 
     // Audio
     const remoteStreams = useVoiceStore((state) => state.remoteStreams)
+    const audioListener = useVoiceStore((state) => state.audioListener)
     const audioRef = useRef<ThreePositionalAudio>(null!)
 
     useEffect(() => {
@@ -59,15 +60,17 @@ export default function CharacterModel({
             }
 
             sound.setMediaStreamSource(stream)
-            sound.setRefDistance(2)
-            sound.setRolloffFactor(2)
+            sound.setRefDistance(1) // Start dropping volume immediately
+            sound.setMaxDistance(25) // Completely silent at 25 meters
+            sound.setRolloffFactor(1)
+            sound.setDistanceModel('linear') // Linear falloff for clear proximity effect
             sound.setVolume(1)
         } else {
             if (playerId && !remoteStreams[playerId]) {
                 console.log(`[CharacterModel] No remote stream for ${playerId}`)
             }
         }
-    }, [playerId, remoteStreams])
+    }, [playerId, remoteStreams, audioListener])
 
     useEffect(() => {
         // Helper to find animation by name (case insensitive, partial match)
@@ -166,8 +169,8 @@ export default function CharacterModel({
             )}
 
             {/* Positional Audio for Remote Players */}
-            {playerId && remoteStreams[playerId] && useVoiceStore.getState().audioListener && (
-                <positionalAudio ref={audioRef} args={[useVoiceStore.getState().audioListener!]} />
+            {playerId && remoteStreams[playerId] && audioListener && (
+                <positionalAudio ref={audioRef} args={[audioListener]} />
             )}
         </group>
     )
