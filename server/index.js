@@ -16,7 +16,7 @@ const ROOMS = [
         mapImage: "/maps/Snowy Village.jpg",
         modelPath: "/models/snowy_village_ps1_environment.glb",
         maxPlayers: 40,
-        spawnPoint: [-0.19, 2.80, -9.25]
+        spawnPoint: [1.98, 9.55, -11.47]
     },
     {
         id: "server-tacos",
