@@ -131,8 +131,8 @@ export default function CharacterModel({
             </Html>
 
             {/* Positional Audio for Remote Players */}
-            {playerId && (
-                <positionalAudio ref={audioRef} />
+            {playerId && remoteStreams[playerId] && useVoiceStore.getState().audioListener && (
+                <positionalAudio ref={audioRef} args={[useVoiceStore.getState().audioListener!]} />
             )}
         </group>
     )

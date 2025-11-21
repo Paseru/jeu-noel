@@ -85,6 +85,7 @@ export default function VoiceChatManager() {
                 peer.signal(signal)
             } else {
                 // Incoming connection (Answerer)
+                // We only accept signals if we didn't initiate (or if we lost the race but that shouldn't happen with deterministic logic)
                 const newPeer = createPeer(sender, socket, localStreamRef.current!, false)
                 peersRef.current[sender] = newPeer
                 newPeer.signal(signal)
@@ -94,7 +95,9 @@ export default function VoiceChatManager() {
         // Handle new player (Initiator)
         socket.on('newPlayer', (player) => {
             if (player.id === playerId) return
-            if (!peersRef.current[player.id]) {
+            // Deterministic initiation: Only initiate if my ID is "greater" than theirs
+            // This prevents double-initiation collisions
+            if (!peersRef.current[player.id] && playerId > player.id) {
                 const peer = createPeer(player.id, socket, localStreamRef.current!, true)
                 peersRef.current[player.id] = peer
             }
@@ -112,8 +115,11 @@ export default function VoiceChatManager() {
         // Connect to existing players
         Object.keys(players).forEach((id) => {
             if (id !== playerId && !peersRef.current[id]) {
-                const peer = createPeer(id, socket, localStreamRef.current!, true)
-                peersRef.current[id] = peer
+                // Same deterministic logic
+                if (playerId > id) {
+                    const peer = createPeer(id, socket, localStreamRef.current!, true)
+                    peersRef.current[id] = peer
+                }
             }
         })
 

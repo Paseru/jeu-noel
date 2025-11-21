@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { useGameStore } from '../stores/useGameStore'
+import { useVoiceStore } from '../stores/useVoiceStore'
 import { useRef, useEffect, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useKeyboardControls, PointerLockControls } from '@react-three/drei'
@@ -46,14 +47,18 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
         }
     }, [socket])
 
+    const setAudioListener = useVoiceStore((state) => state.setAudioListener)
+
     // Audio Listener (The "Ears" of the player)
     useEffect(() => {
         const listener = new THREE.AudioListener()
         camera.add(listener)
+        setAudioListener(listener)
         return () => {
             camera.remove(listener)
+            setAudioListener(null)
         }
-    }, [camera])
+    }, [camera, setAudioListener])
 
     // Toggle View
     useEffect(() => {
