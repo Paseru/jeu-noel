@@ -4,6 +4,7 @@ import { Lights } from './World/Lights'
 import { Environment } from './World/Environment'
 import { Map } from './World/Map'
 import { Snow } from './World/Snow'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 import { useGameStore } from './stores/useGameStore'
 import RemotePlayer from './Multiplayer/RemotePlayer'
@@ -24,7 +25,14 @@ export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
                 <Lights />
                 <Environment />
                 <Snow />
-                <Map />
+                <ErrorBoundary fallback={
+                    <mesh position={[0, 1, 0]}>
+                        <boxGeometry args={[1, 1, 1]} />
+                        <meshStandardMaterial color="red" wireframe />
+                    </mesh>
+                }>
+                    <Map />
+                </ErrorBoundary>
                 <PlayerController isSettingsOpen={isSettingsOpen} />
 
                 {/* Remote Players */}
