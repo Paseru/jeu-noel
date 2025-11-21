@@ -82,11 +82,12 @@ export default function VoiceChatManager() {
 
         // Handle incoming signals
         const handleSignal = ({ sender, signal }: { sender: string, signal: any }) => {
+            console.log(`[VoiceChat] Received signal from ${sender}`)
             const peer = peersRef.current[sender]
             if (peer) {
                 peer.signal(signal)
             } else {
-                // Incoming connection (Answerer)
+                console.log(`[VoiceChat] New incoming connection from ${sender}`)
                 const newPeer = createPeer(sender, socket, localStreamRef.current!, false)
                 peersRef.current[sender] = newPeer
                 newPeer.signal(signal)
@@ -96,8 +97,8 @@ export default function VoiceChatManager() {
         // Handle new player (Initiator)
         const handleNewPlayer = (player: any) => {
             if (player.id === playerId) return
-            // Deterministic initiation: Only initiate if my ID is "greater" than theirs
             if (!peersRef.current[player.id] && playerId > player.id) {
+                console.log(`[VoiceChat] Initiating connection to ${player.id}`)
                 const peer = createPeer(player.id, socket, localStreamRef.current!, true)
                 peersRef.current[player.id] = peer
             }
@@ -106,6 +107,7 @@ export default function VoiceChatManager() {
         // Handle player disconnected
         const handlePlayerDisconnected = (id: string) => {
             if (peersRef.current[id]) {
+                console.log(`[VoiceChat] Player disconnected: ${id}`)
                 peersRef.current[id].destroy()
                 delete peersRef.current[id]
                 removeRemoteStream(id)
@@ -129,8 +131,8 @@ export default function VoiceChatManager() {
 
         Object.keys(players).forEach((id) => {
             if (id !== playerId && !peersRef.current[id]) {
-                // Same deterministic logic
                 if (playerId > id) {
+                    console.log(`[VoiceChat] Maintenance: Initiating connection to ${id}`)
                     const peer = createPeer(id, socket, localStreamRef.current!, true)
                     peersRef.current[id] = peer
                 }
@@ -139,6 +141,7 @@ export default function VoiceChatManager() {
     }, [players, playerId, socket])
 
     function createPeer(targetId: string, socket: any, stream: MediaStream, initiator: boolean) {
+        console.log(`[VoiceChat] Creating peer for ${targetId} (Initiator: ${initiator})`)
         const peer = new SimplePeer({
             initiator,
             trickle: false,
@@ -146,15 +149,21 @@ export default function VoiceChatManager() {
         })
 
         peer.on('signal', (signal: any) => {
+            // console.log(`[VoiceChat] Sending signal to ${targetId}`)
             socket.emit('signal', { target: targetId, signal })
         })
 
         peer.on('stream', (remoteStream: MediaStream) => {
+            console.log(`[VoiceChat] Received stream from ${targetId}`)
             addRemoteStream(targetId, remoteStream)
         })
 
         peer.on('error', (err: Error) => {
-            console.error('Peer error:', err)
+            console.error(`[VoiceChat] Peer error with ${targetId}:`, err)
+        })
+
+        peer.on('connect', () => {
+            console.log(`[VoiceChat] Connected to ${targetId}`)
         })
 
         return peer

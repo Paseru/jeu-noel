@@ -40,6 +40,7 @@ export default function CharacterModel({
 
     useEffect(() => {
         if (playerId && remoteStreams[playerId] && audioRef.current) {
+            console.log(`[CharacterModel] Attaching audio for ${playerId}`)
             const sound = audioRef.current
             const stream = remoteStreams[playerId]
 
@@ -48,9 +49,12 @@ export default function CharacterModel({
             const audioEl = new Audio()
             audioEl.srcObject = stream
             audioEl.muted = true // Mute it because we want the 3D audio, not the flat audio
-            audioEl.play().catch(e => console.error("Error playing hidden audio:", e))
+            audioEl.play()
+                .then(() => console.log(`[CharacterModel] Hidden audio playing for ${playerId}`))
+                .catch(e => console.error(`[CharacterModel] Error playing hidden audio for ${playerId}:`, e))
 
             if (sound.context.state === 'suspended') {
+                console.log(`[CharacterModel] Resuming AudioContext`)
                 sound.context.resume()
             }
 
@@ -58,6 +62,10 @@ export default function CharacterModel({
             sound.setRefDistance(2)
             sound.setRolloffFactor(2)
             sound.setVolume(1)
+        } else {
+            if (playerId && !remoteStreams[playerId]) {
+                console.log(`[CharacterModel] No remote stream for ${playerId}`)
+            }
         }
     }, [playerId, remoteStreams])
 
@@ -125,7 +133,7 @@ export default function CharacterModel({
             const distance = cameraPos.distanceTo(characterPos)
 
             // Only update state if it changes to avoid re-renders
-            const shouldBeVisible = distance < 30
+            const shouldBeVisible = distance < 20
             if (shouldBeVisible !== isNameplateVisible) {
                 setIsNameplateVisible(shouldBeVisible)
             }
