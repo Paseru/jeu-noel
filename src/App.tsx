@@ -11,6 +11,7 @@ import VoiceChatManager from './components/VoiceChatManager'
 import { useGameStore } from './stores/useGameStore'
 import { useVoiceStore } from './stores/useVoiceStore'
 import MobileControls from './UI/MobileControls'
+import { InteractionPrompt } from './UI/InteractionPrompt'
 import PlayerList from './UI/PlayerList'
 
 export default function App() {
@@ -174,6 +175,8 @@ export default function App() {
                     <VoiceChatManager />
                     <VoiceIndicator />
                     {!isSettingsOpen && !isPauseMenuOpen && !isPlayerListOpen && <MobileControls />}
+
+                    <InteractionPrompt />
 
                     {/* Player List Overlay */}
                     {isPlayerListOpen && <PlayerList />}

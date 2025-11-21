@@ -84,6 +84,10 @@ interface GameState {
     setPlayers: (players: Record<string, PlayerState>) => void
     sendMessage: (text: string) => void
     addChatMessage: (message: ChatMessage) => void
+
+    // Interaction System
+    interactionText: string | null
+    setInteractionText: (text: string | null) => void
 }
 
 export const useGameStore = create<GameState>((set, get) => ({

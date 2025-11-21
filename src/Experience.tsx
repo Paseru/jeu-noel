@@ -1,4 +1,4 @@
-import { Physics, RigidBody } from '@react-three/rapier'
+import { Physics } from '@react-three/rapier'
 import { PlayerController } from './Player/PlayerController'
 import { Lights } from './World/Lights'
 import { Environment } from './World/Environment'
