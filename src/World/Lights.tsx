@@ -9,8 +9,8 @@ export const Lights = () => {
 
     return (
         <>
-            {/* Ambient Light: Very dark night blue, almost black */}
-            <ambientLight intensity={0.02} color="#050511" />
+            {/* Ambient Light: Increased for visibility */}
+            <ambientLight intensity={0.5} color="#050511" />
 
             {/* Main Moon Light: Dim, cold blue */}
             <directionalLight

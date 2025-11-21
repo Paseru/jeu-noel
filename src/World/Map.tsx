@@ -41,7 +41,7 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
 
                         // 2. Darken textures (existing logic)
                         if (!mat.userData.darkened) {
-                            mat.color.multiplyScalar(0.3)
+                            mat.color.multiplyScalar(0.8)
                             mat.userData.darkened = true
                         }
 
