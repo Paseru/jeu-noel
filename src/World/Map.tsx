@@ -4,22 +4,9 @@ import { useMemo } from 'react'
 import * as THREE from 'three'
 import { useGameStore } from '../stores/useGameStore'
 
-export const Map = () => {
-    const { currentRoomId, rooms } = useGameStore()
-
-    const { modelPath, scale } = useMemo(() => {
-        const room = rooms.find(r => r.id === currentRoomId)
-        if (!room) return { modelPath: null, scale: 1 }
-
-        return {
-            modelPath: room.modelPath,
-            scale: room.scale || 1
-        }
-    }, [currentRoomId, rooms])
-
-    // If no map is selected (e.g. Main Menu), render nothing
-    if (!modelPath) return null
-
+// Internal component that handles the actual loading
+// This component MUST only be rendered when modelPath is valid
+const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) => {
     const { scene } = useGLTF(modelPath)
 
     // Extract plants to a separate group to disable their physics
@@ -119,4 +106,23 @@ export const Map = () => {
             <primitive object={plantScene} scale={scale} />
         </>
     )
+}
+
+export const Map = () => {
+    const { currentRoomId, rooms } = useGameStore()
+
+    const { modelPath, scale } = useMemo(() => {
+        const room = rooms.find(r => r.id === currentRoomId)
+        if (!room) return { modelPath: null, scale: 1 }
+
+        return {
+            modelPath: room.modelPath,
+            scale: room.scale || 1
+        }
+    }, [currentRoomId, rooms])
+
+    // If no map is selected (e.g. Main Menu), render nothing
+    if (!modelPath) return null
+
+    return <MapContent modelPath={modelPath} scale={scale} />
 }
