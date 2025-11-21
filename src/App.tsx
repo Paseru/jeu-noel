@@ -93,7 +93,7 @@ export default function App() {
                     <Chat />
                     <VoiceChatManager />
                     <VoiceIndicator />
-                    <MobileControls />
+                    {!isSettingsOpen && <MobileControls />}
 
                     <div className="absolute top-0 left-0 w-full p-8 pointer-events-none flex justify-between items-start z-50">
                         {/* Top Left: Settings Button */}

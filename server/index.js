@@ -8,82 +8,121 @@ const io = new Server(PORT, {
     },
 });
 
-let players = {};
-let nextCharacterIndex = 1; // Start at 1
+// Define available rooms (servers)
+const ROOMS = [
+    { id: "server-1", name: "Snowy Village", mapImage: "/maps/Snowy Village.jpg", modelPath: "/models/snowy_village_ps1_environment.glb", maxPlayers: 20 },
+    { id: "server-2", name: "City Center", mapImage: "/maps/City 1.jpeg", modelPath: "/models/city 1.glb", maxPlayers: 20 },
+    { id: "server-3", name: "The Hood", mapImage: "/maps/Hood.jpeg", modelPath: "/models/hood.glb", maxPlayers: 20 },
+    { id: "server-4", name: "Subway Station", mapImage: "/maps/Subway.jpg", modelPath: "/models/Subway.glb", maxPlayers: 20 },
+    { id: "server-5", name: "Santa's Workshop", mapImage: "/maps/Workshop.jpeg", modelPath: "/models/Workshop.glb", maxPlayers: 20 },
+    { id: "server-6", name: "Jailhouse", mapImage: "/maps/Jailhouse.jpeg", modelPath: "/models/jailhouse_rock.glb", maxPlayers: 20 },
+    { id: "server-7", name: "Abandoned Hospital", mapImage: "/maps/Abandonned Hospital.jpeg", modelPath: "/models/Abandonned Hospital.glb", maxPlayers: 20 }
+];
+
+let players = {}; // { socketId: { ...playerData, roomId } }
+let nextCharacterIndex = 1;
 
 io.on("connection", (socket) => {
-    console.log("New player connected:", socket.id);
+    console.log("New connection:", socket.id);
 
-    // Assign character index sequentially
-    const assignedCharacterIndex = nextCharacterIndex;
-    nextCharacterIndex++;
-    if (nextCharacterIndex > 5) {
-        nextCharacterIndex = 1;
-    }
+    // Send available rooms and their current player counts
+    socket.on("getRooms", () => {
+        const roomData = ROOMS.map(room => {
+            const count = Object.values(players).filter(p => p.roomId === room.id).length;
+            return { ...room, playerCount: count };
+        });
+        socket.emit("roomList", roomData);
+    });
 
-    // Add new player
-    players[socket.id] = {
-        id: socket.id,
-        position: [0, 0, -1],
-        quaternion: [0, 0, 0, 1],
-        isMoving: false,
-        isRunning: false,
-        characterIndex: assignedCharacterIndex, // Assigned by server
-        isSpeaking: false,
-        nickname: "Player" // Default
-    };
-
-    // Send current players to the new player
-    socket.emit("currentPlayers", players);
-
-    // Broadcast new player to everyone else
-    socket.broadcast.emit("newPlayer", players[socket.id]);
-
-    // Handle player initialization (nickname only now)
-    socket.on("initPlayer", (data) => {
-        if (players[socket.id]) {
-            // Ignore client sent characterIndex, keep server assigned one
-            // players[socket.id].characterIndex = data.characterIndex; 
-            players[socket.id].nickname = data.nickname;
-
-            // Broadcast the update so everyone knows this player's nickname
-            io.emit("updatePlayerState", players[socket.id]);
+    socket.on("joinRoom", ({ roomId, nickname }) => {
+        // Validate room
+        const room = ROOMS.find(r => r.id === roomId);
+        if (!room) {
+            socket.emit("error", "Invalid room");
+            return;
         }
+
+        // Join the socket.io room
+        socket.join(roomId);
+
+        // Assign character index sequentially
+        const assignedCharacterIndex = nextCharacterIndex;
+        nextCharacterIndex++;
+        if (nextCharacterIndex > 5) {
+            nextCharacterIndex = 1;
+        }
+
+        // Create player object
+        players[socket.id] = {
+            id: socket.id,
+            roomId: roomId,
+            position: [0, 0, -1],
+            quaternion: [0, 0, 0, 1],
+            isMoving: false,
+            isRunning: false,
+            characterIndex: assignedCharacterIndex,
+            isSpeaking: false,
+            nickname: nickname || "Player"
+        };
+
+        // Get all players in THIS room
+        const roomPlayers = {};
+        Object.values(players).forEach(p => {
+            if (p.roomId === roomId) {
+                roomPlayers[p.id] = p;
+            }
+        });
+
+        // Send current players in this room to the new player
+        socket.emit("currentPlayers", roomPlayers);
+
+        // Broadcast new player to everyone else in the room
+        socket.to(roomId).emit("newPlayer", players[socket.id]);
+
+        console.log(`Player ${socket.id} joined room ${roomId} as ${players[socket.id].nickname}`);
     });
 
     // Handle player movement
     socket.on("playerMove", (data) => {
-        if (players[socket.id]) {
-            players[socket.id].position = data.position;
-            players[socket.id].quaternion = data.quaternion;
-            players[socket.id].isMoving = data.isMoving;
-            players[socket.id].isRunning = data.isRunning;
+        const player = players[socket.id];
+        if (player) {
+            player.position = data.position;
+            player.quaternion = data.quaternion;
+            player.isMoving = data.isMoving;
+            player.isRunning = data.isRunning;
 
-            socket.broadcast.emit("playerMoved", {
+            socket.to(player.roomId).emit("playerMoved", {
                 id: socket.id,
                 position: data.position,
                 quaternion: data.quaternion,
                 isMoving: data.isMoving,
                 isRunning: data.isRunning,
-                characterIndex: players[socket.id].characterIndex,
-                isSpeaking: players[socket.id].isSpeaking // Broadcast speaking state
+                characterIndex: player.characterIndex,
+                isSpeaking: player.isSpeaking
             });
         }
     });
 
     // Handle WebRTC Signaling
     socket.on("signal", (data) => {
-        io.to(data.target).emit("signal", {
-            sender: socket.id,
-            signal: data.signal
-        });
+        // Ensure target is in the same room (optional security, but good practice)
+        const sender = players[socket.id];
+        const target = players[data.target];
+
+        if (sender && target && sender.roomId === target.roomId) {
+            io.to(data.target).emit("signal", {
+                sender: socket.id,
+                signal: data.signal
+            });
+        }
     });
 
     // Handle Speaking State
     socket.on("speaking", (isSpeaking) => {
-        if (players[socket.id]) {
-            players[socket.id].isSpeaking = isSpeaking;
-            socket.broadcast.emit("playerSpeaking", {
+        const player = players[socket.id];
+        if (player) {
+            player.isSpeaking = isSpeaking;
+            socket.to(player.roomId).emit("playerSpeaking", {
                 id: socket.id,
                 isSpeaking
             });
@@ -92,23 +131,29 @@ io.on("connection", (socket) => {
 
     // Handle Chat Messages
     socket.on("chatMessage", (text) => {
-        if (players[socket.id]) {
+        const player = players[socket.id];
+        if (player) {
             const message = {
-                id: Date.now().toString(), // Simple ID generation
+                id: Date.now().toString(),
                 senderId: socket.id,
-                senderName: players[socket.id].nickname,
+                senderName: player.nickname,
                 text: text,
                 timestamp: Date.now()
             };
-            io.emit("chatMessage", message);
+            // Broadcast to room only
+            io.to(player.roomId).emit("chatMessage", message);
         }
     });
 
     // Handle disconnect
     socket.on("disconnect", () => {
-        console.log("Player disconnected:", socket.id);
-        delete players[socket.id];
-        io.emit("playerDisconnected", socket.id);
+        const player = players[socket.id];
+        if (player) {
+            console.log("Player disconnected:", socket.id);
+            const roomId = player.roomId;
+            delete players[socket.id];
+            io.to(roomId).emit("playerDisconnected", socket.id);
+        }
     });
 });
 

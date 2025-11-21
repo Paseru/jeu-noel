@@ -9,7 +9,7 @@ export default function VoiceChatManager() {
     const players = useGameStore((state) => state.players)
     const setSpeaking = useGameStore((state) => state.setSpeaking)
 
-    const { setLocalStream, addRemoteStream, removeRemoteStream } = useVoiceStore()
+    const { localStream, setLocalStream, addRemoteStream, removeRemoteStream } = useVoiceStore()
 
     const localStreamRef = useRef<MediaStream | null>(null)
     const peersRef = useRef<Record<string, SimplePeer.Instance>>({})
@@ -85,7 +85,7 @@ export default function VoiceChatManager() {
 
     // Socket Events for WebRTC - Stable Listeners
     useEffect(() => {
-        if (!socket || !playerId || !localStreamRef.current) return
+        if (!socket || !playerId || !localStream) return
 
         // Handle incoming signals
         const handleSignal = ({ sender, signal }: { sender: string, signal: any }) => {
@@ -95,7 +95,7 @@ export default function VoiceChatManager() {
                 peer.signal(signal)
             } else {
                 console.log(`[VoiceChat] New incoming connection from ${sender}`)
-                const newPeer = createPeer(sender, socket, localStreamRef.current!, false)
+                const newPeer = createPeer(sender, socket, localStream!, false)
                 peersRef.current[sender] = newPeer
                 newPeer.signal(signal)
             }
@@ -106,7 +106,7 @@ export default function VoiceChatManager() {
             if (player.id === playerId) return
             if (!peersRef.current[player.id] && playerId > player.id) {
                 console.log(`[VoiceChat] Initiating connection to ${player.id}`)
-                const peer = createPeer(player.id, socket, localStreamRef.current!, true)
+                const peer = createPeer(player.id, socket, localStream!, true)
                 peersRef.current[player.id] = peer
             }
         }
@@ -130,7 +130,7 @@ export default function VoiceChatManager() {
             socket.off('newPlayer', handleNewPlayer)
             socket.off('playerDisconnected', handlePlayerDisconnected)
         }
-    }, [socket, playerId, removeRemoteStream]) // Removed 'players' dependency
+    }, [socket, playerId, removeRemoteStream, localStream]) // Added localStream dependency
 
     // Connection Maintenance - Dynamic (Checks for missing connections)
     useEffect(() => {

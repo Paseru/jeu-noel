@@ -2,15 +2,23 @@ import { useGLTF } from '@react-three/drei'
 import { RigidBody } from '@react-three/rapier'
 import { useMemo } from 'react'
 import * as THREE from 'three'
+import { useGameStore } from '../stores/useGameStore'
 
 export const Map = () => {
-    const { scene } = useGLTF('/models/snowy_village_ps1_environment.glb')
+    const { currentRoomId, rooms } = useGameStore()
+
+    const modelPath = useMemo(() => {
+        const room = rooms.find(r => r.id === currentRoomId)
+        return room?.modelPath || '/models/snowy_village_ps1_environment.glb'
+    }, [currentRoomId, rooms])
+
+    const { scene } = useGLTF(modelPath)
 
     // Extract plants to a separate group to disable their physics
     // We use useMemo to do this only once
     const { solidScene, plantScene } = useMemo(() => {
         // Clone the scene to avoid mutating the cached GLTF result
-        // This fixes issues where objects disappear on hot reload because they were removed from the original scene
+        // This fixes issues where issues disappear on hot reload because they were removed from the original scene
         const clonedScene = scene.clone()
 
         // We will modify the original scene structure, so we don't clone the whole thing (saves memory)
@@ -104,5 +112,3 @@ export const Map = () => {
         </>
     )
 }
-
-useGLTF.preload('/models/snowy_village_ps1_environment.glb')

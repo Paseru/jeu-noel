@@ -25,11 +25,22 @@ interface ChatMessage {
     timestamp: number
 }
 
+interface Room {
+    id: string
+    name: string
+    mapImage: string
+    modelPath: string
+    maxPlayers: number
+    playerCount: number
+}
+
 interface GameState {
     phase: 'MENU' | 'PLAYING'
     socket: Socket | null
     players: Record<string, PlayerState>
     messages: ChatMessage[]
+    rooms: Room[]
+    currentRoomId: string | null
 
     playerId: string | null
     nickname: string
@@ -47,8 +58,11 @@ interface GameState {
     setNickname: (name: string) => void
     setChatOpen: (isOpen: boolean) => void
     setSpeaking: (isSpeaking: boolean) => void
-    startPlaying: () => void
+
     connectSocket: () => void
+    fetchRooms: () => void
+    joinRoom: (roomId: string) => void
+
     updatePlayer: (id: string, position: [number, number, number], quaternion: [number, number, number, number]) => void
     addPlayer: (player: PlayerState) => void
     removePlayer: (id: string) => void
@@ -61,6 +75,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     socket: null,
     players: {},
     messages: [],
+    rooms: [],
+    currentRoomId: null,
     playerId: null,
     nickname: '',
     isChatOpen: false,
@@ -101,11 +117,6 @@ export const useGameStore = create<GameState>((set, get) => ({
         }
     },
 
-    startPlaying: () => {
-        set({ phase: 'PLAYING' })
-        get().connectSocket()
-    },
-
     connectSocket: () => {
         if (get().socket) return
 
@@ -115,11 +126,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         socket.on('connect', () => {
             console.log('Connected to server:', serverUrl)
             set({ playerId: socket.id })
-            // Send initial player info including nickname
-            socket.emit('initPlayer', {
-                nickname: get().nickname,
-                characterIndex: 1
-            })
+        })
+
+        socket.on('roomList', (rooms) => {
+            set({ rooms })
         })
 
         socket.on('currentPlayers', (players) => {
@@ -195,6 +205,28 @@ export const useGameStore = create<GameState>((set, get) => ({
         })
 
         set({ socket })
+    },
+
+    fetchRooms: () => {
+        const socket = get().socket
+        if (socket) {
+            socket.emit('getRooms')
+        } else {
+            // Ensure socket is connected first
+            get().connectSocket()
+            // Wait a bit for connection (simple hack, or rely on auto-reconnect logic)
+            setTimeout(() => {
+                get().socket?.emit('getRooms')
+            }, 500)
+        }
+    },
+
+    joinRoom: (roomId: string) => {
+        const socket = get().socket
+        if (socket) {
+            socket.emit('joinRoom', { roomId, nickname: get().nickname })
+            set({ phase: 'PLAYING', currentRoomId: roomId })
+        }
     },
 
     sendMessage: (text: string) => {

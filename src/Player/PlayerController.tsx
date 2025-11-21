@@ -114,15 +114,25 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
 
         // Apply Camera Rotation from Touch
         if (lookDelta.x !== 0 || lookDelta.y !== 0) {
-            const SENSITIVITY = 0.015 // Increased from 0.002 for faster mobile look
-            camera.rotation.y -= lookDelta.x * SENSITIVITY
-            // Clamp pitch? For now just simple yaw/pitch
-            // Actually, PointerLockControls usually handles this.
-            // If we are using PointerLockControls, we might fight it.
-            // But on mobile, PointerLockControls might not be active or we might need to manually rotate the camera object.
-            // Let's try modifying camera.rotation directly first.
+            const SENSITIVITY = 0.005 // Reduced sensitivity for smoother control
 
-            // Note: PointerLockControls modifies camera.rotation.
+            // Yaw (Y axis) - World Axis
+            // We need to rotate around the world Y axis, but camera.rotation.y is local if parented.
+            // However, camera is usually at root or parented to a non-rotated object in this setup?
+            // Actually, camera.rotation.y is fine for yaw if we use YXZ order.
+
+            camera.rotation.order = 'YXZ' // Important for FPS camera to avoid gimbal lock
+
+            camera.rotation.y -= lookDelta.x * SENSITIVITY
+            camera.rotation.x -= lookDelta.y * SENSITIVITY
+
+            // Clamp pitch (X axis) to avoid flipping
+            // Limit to ~85 degrees up and down
+            const maxPolarAngle = 1.5
+            camera.rotation.x = Math.max(-maxPolarAngle, Math.min(maxPolarAngle, camera.rotation.x))
+
+            // Ensure no roll
+            camera.rotation.z = 0
 
             resetLookDelta()
         }

@@ -10,4 +10,4 @@ trigger: always_on
 - Tu veux vérifier les meilleures pratiques actuelles (post-janvier 2025)
 
 
-# Langue de l'application TOUT en anglais
+# Langue de l'application TOUT en anglais mais tu dois me parler en francais dans le chat
