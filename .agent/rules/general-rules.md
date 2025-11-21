@@ -11,3 +11,5 @@ trigger: always_on
 
 
 # Langue de l'application TOUT en anglais mais tu dois me parler en francais dans le chat
+
+# Push github à CHAQUE modification

@@ -16,15 +16,15 @@ const ROOMS = [
         mapImage: "/maps/Snowy Village.jpg",
         modelPath: "/models/snowy_village_ps1_environment.glb",
         maxPlayers: 40,
-        spawnPoint: [-0.19, 1.80, -9.25]
+        spawnPoint: [-0.19, 2.80, -9.25]
     },
     {
         id: "server-tacos",
         name: "Tacos World",
-        mapImage: "/maps/Snowy Village.jpg", // Placeholder image
+        mapImage: "/maps/Tacos.jpg",
         modelPath: "/models/tacos (1).glb",
         maxPlayers: 40,
-        spawnPoint: [0, 5, 0]
+        spawnPoint: [-0.13, 2.06, 16.38]
     }
 ];
 

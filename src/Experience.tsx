@@ -1,4 +1,5 @@
 import { Physics } from '@react-three/rapier'
+import { Suspense } from 'react'
 import { PlayerController } from './Player/PlayerController'
 import { Lights } from './World/Lights'
 import { Environment } from './World/Environment'
@@ -37,22 +38,24 @@ export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
                 <PlayerController isSettingsOpen={isSettingsOpen} />
 
                 {/* Remote Players */}
-                {Object.values(players).map((player) => {
-                    if (playerId && player.id === playerId) return null
-                    return (
-                        <RemotePlayer
-                            key={player.id}
-                            id={player.id}
-                            position={player.position}
-                            quaternion={player.quaternion}
-                            isMoving={player.isMoving}
-                            isRunning={player.isRunning}
-                            characterIndex={player.characterIndex}
-                            nickname={player.nickname}
-                            isSpeaking={player.isSpeaking}
-                        />
-                    )
-                })}
+                <Suspense fallback={null}>
+                    {Object.values(players).map((player) => {
+                        if (playerId && player.id === playerId) return null
+                        return (
+                            <RemotePlayer
+                                key={player.id}
+                                id={player.id}
+                                position={player.position}
+                                quaternion={player.quaternion}
+                                isMoving={player.isMoving}
+                                isRunning={player.isRunning}
+                                characterIndex={player.characterIndex}
+                                nickname={player.nickname}
+                                isSpeaking={player.isSpeaking}
+                            />
+                        )
+                    })}
+                </Suspense>
             </Physics>
 
             {/* <Lights /> */}

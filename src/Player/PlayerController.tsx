@@ -181,7 +181,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
 
         // Apply Camera Rotation from Touch
         if (lookDelta.x !== 0 || lookDelta.y !== 0) {
-            const SENSITIVITY = 0.005 // Reduced sensitivity for smoother control
+            const SENSITIVITY = 0.008 // Increased sensitivity for mobile
 
             camera.rotation.order = 'YXZ' // Important for FPS camera to avoid gimbal lock
 
