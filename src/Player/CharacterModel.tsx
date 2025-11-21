@@ -66,10 +66,13 @@ export default function CharacterModel({
             sound.setDistanceModel('linear') // Linear falloff for clear proximity effect
             sound.setVolume(1)
 
+            // Cleanup function removed to prevent audio cutting out
+            // We rely on the component unmounting to eventually garbage collect the audio element
+            // This is a tradeoff to ensure reliability over memory usage for now
             return () => {
-                console.log(`[CharacterModel] Cleaning up audio for ${playerId}`)
-                audioEl.pause()
-                audioEl.srcObject = null
+                // console.log(`[CharacterModel] Cleaning up audio for ${playerId}`)
+                // audioEl.pause()
+                // audioEl.srcObject = null
             }
         } else {
             if (playerId && !stream) {
