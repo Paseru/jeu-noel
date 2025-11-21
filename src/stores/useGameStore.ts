@@ -123,7 +123,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         })
 
         socket.on('currentPlayers', (players) => {
-            set((state) => {
+            set(() => {
                 if (socket.id && players[socket.id]) {
                     return { players, myCharacterIndex: players[socket.id].characterIndex }
                 }

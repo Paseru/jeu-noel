@@ -8,6 +8,7 @@ import Settings from './UI/Settings'
 import VoiceIndicator from './UI/VoiceIndicator'
 import VoiceChatManager from './components/VoiceChatManager'
 import { useGameStore } from './stores/useGameStore'
+import { useVoiceStore } from './stores/useVoiceStore'
 import MobileControls from './UI/MobileControls'
 
 export default function App() {
