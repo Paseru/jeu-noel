@@ -9,6 +9,9 @@ import { useGameStore } from '../stores/useGameStore'
 const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) => {
     const { scene } = useGLTF(modelPath)
 
+    console.log("MapContent mounted. ModelPath:", modelPath, "Scale:", scale)
+
+
     // Extract plants to a separate group to disable their physics
     // We use useMemo to do this only once
     const { solidScene, plantScene } = useMemo(() => {
@@ -39,6 +42,8 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
                         // Ideally we should clone materials if we modify them, but for now we modify in place 
                         // as we want this style globally.
 
+                        // DEBUG: Disable material mods to see if this fixes the black screen
+                        /*
                         // 2. Darken textures (existing logic)
                         if (!mat.userData.darkened) {
                             mat.color.multiplyScalar(0.8)
@@ -54,6 +59,7 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
                             mat.alphaTest = 0.5
                             mat.side = THREE.DoubleSide // Ensure leaves are visible from both sides
                         }
+                        */
                     }
                 })
 
