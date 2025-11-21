@@ -147,6 +147,20 @@ export default function VoiceChatManager() {
         })
     }, [players, playerId, socket])
 
+    // Handle Muting
+    const mutedPlayers = useVoiceStore((state) => state.mutedPlayers)
+    const remoteStreams = useVoiceStore((state) => state.remoteStreams)
+
+    useEffect(() => {
+        Object.keys(remoteStreams).forEach((id) => {
+            const stream = remoteStreams[id]
+            const isMuted = mutedPlayers[id]
+            stream.getAudioTracks().forEach((track) => {
+                track.enabled = !isMuted
+            })
+        })
+    }, [mutedPlayers, remoteStreams])
+
     function createPeer(targetId: string, socket: any, stream: MediaStream, initiator: boolean) {
         console.log(`[VoiceChat] Creating peer for ${targetId} (Initiator: ${initiator})`)
         const peer = new SimplePeer({

@@ -6,11 +6,13 @@ interface VoiceState {
     remoteStreams: Record<string, MediaStream>
     audioListener: THREE.AudioListener | null
     isMicrophoneActive: boolean
+    mutedPlayers: Record<string, boolean>
     setLocalStream: (stream: MediaStream | null) => void
     addRemoteStream: (id: string, stream: MediaStream) => void
     removeRemoteStream: (id: string) => void
     setAudioListener: (listener: THREE.AudioListener | null) => void
     setMicrophoneActive: (isActive: boolean) => void
+    toggleMute: (playerId: string) => void
 }
 
 export const useVoiceStore = create<VoiceState>((set) => ({
@@ -18,6 +20,7 @@ export const useVoiceStore = create<VoiceState>((set) => ({
     remoteStreams: {},
     audioListener: null,
     isMicrophoneActive: false,
+    mutedPlayers: {},
     setLocalStream: (stream) => set({ localStream: stream }),
     addRemoteStream: (id, stream) => set((state) => ({
         remoteStreams: { ...state.remoteStreams, [id]: stream }
@@ -27,5 +30,11 @@ export const useVoiceStore = create<VoiceState>((set) => ({
         return { remoteStreams: rest }
     }),
     setAudioListener: (listener) => set({ audioListener: listener }),
-    setMicrophoneActive: (isActive) => set({ isMicrophoneActive: isActive })
+    setMicrophoneActive: (isActive) => set({ isMicrophoneActive: isActive }),
+    toggleMute: (playerId) => set((state) => ({
+        mutedPlayers: {
+            ...state.mutedPlayers,
+            [playerId]: !state.mutedPlayers[playerId]
+        }
+    }))
 }))

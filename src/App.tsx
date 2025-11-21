@@ -11,6 +11,7 @@ import VoiceChatManager from './components/VoiceChatManager'
 import { useGameStore } from './stores/useGameStore'
 import { useVoiceStore } from './stores/useVoiceStore'
 import MobileControls from './UI/MobileControls'
+import PlayerList from './UI/PlayerList'
 
 export default function App() {
     const map = useMemo(() => [
@@ -25,6 +26,7 @@ export default function App() {
 
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
     const [isPauseMenuOpen, setIsPauseMenuOpen] = useState(false)
+    const [isPlayerListOpen, setIsPlayerListOpen] = useState(false)
     const audioRef = useRef<HTMLAudioElement>(null)
 
     const { phase, volumes } = useGameStore()
@@ -60,11 +62,27 @@ export default function App() {
         }
     }, [audioListener])
 
-    // Handle Escape key for Pause Menu & Debug Mode (P)
+    // Handle Escape key & Tab Key
     useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Tab for Player List
+            if (e.code === 'Tab') {
+                e.preventDefault() // Prevent focus change
+                if (phase === 'PLAYING' && !isSettingsOpen && !isPauseMenuOpen) {
+                    setIsPlayerListOpen(prev => !prev)
+                }
+            }
+        }
+
         const handleKeyUp = (e: KeyboardEvent) => {
             if (e.code === 'Escape') {
                 if (phase === 'PLAYING') {
+                    // If player list is open, close it
+                    if (isPlayerListOpen) {
+                        setIsPlayerListOpen(false)
+                        return
+                    }
+
                     // If settings are open, close them
                     if (isSettingsOpen) {
                         setIsSettingsOpen(false)
@@ -86,13 +104,36 @@ export default function App() {
             }
         }
 
+        // Pointer Lock Change Listener (For Escape key behavior)
+        const handlePointerLockChange = () => {
+            // If pointer lock is lost AND we are playing AND no menu is open, open pause menu
+            // This handles the case where user presses Escape (which natively exits pointer lock)
+            if (
+                document.pointerLockElement === null &&
+                phase === 'PLAYING' &&
+                !isSettingsOpen &&
+                !isPauseMenuOpen &&
+                !isPlayerListOpen // Don't open pause menu if player list is open (since we need cursor there)
+            ) {
+                setIsPauseMenuOpen(true)
+            }
+        }
+
+        window.addEventListener('keydown', handleKeyDown)
         window.addEventListener('keyup', handleKeyUp)
-        return () => window.removeEventListener('keyup', handleKeyUp)
-    }, [phase, isSettingsOpen, isPauseMenuOpen])
+        document.addEventListener('pointerlockchange', handlePointerLockChange)
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown)
+            window.removeEventListener('keyup', handleKeyUp)
+            document.removeEventListener('pointerlockchange', handlePointerLockChange)
+        }
+    }, [phase, isSettingsOpen, isPauseMenuOpen, isPlayerListOpen])
 
     const handleQuit = () => {
         setIsPauseMenuOpen(false)
         setIsSettingsOpen(false)
+        setIsPlayerListOpen(false)
         // Disconnect/Leave room logic could go here if needed
         // For now just switch phase to MENU
         useGameStore.setState({ phase: 'MENU', currentRoomId: null })
@@ -117,7 +158,7 @@ export default function App() {
                 }}
             >
                 <Suspense fallback={null}>
-                    <Experience isSettingsOpen={isSettingsOpen || isPauseMenuOpen} />
+                    <Experience isSettingsOpen={isSettingsOpen || isPauseMenuOpen || isPlayerListOpen} />
                 </Suspense>
             </Canvas>
 
@@ -132,7 +173,10 @@ export default function App() {
                     <Chat />
                     <VoiceChatManager />
                     <VoiceIndicator />
-                    {!isSettingsOpen && !isPauseMenuOpen && <MobileControls />}
+                    {!isSettingsOpen && !isPauseMenuOpen && !isPlayerListOpen && <MobileControls />}
+
+                    {/* Player List Overlay */}
+                    {isPlayerListOpen && <PlayerList />}
 
                     {/* Pause Menu */}
                     {isPauseMenuOpen && !isSettingsOpen && (

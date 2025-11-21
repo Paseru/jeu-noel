@@ -15,7 +15,7 @@ const ROOMS = [
         name: "Snowy Village",
         mapImage: "/maps/Snowy Village.jpg",
         modelPath: "/models/snowy_village_ps1_environment.glb",
-        maxPlayers: 20,
+        maxPlayers: 40,
         spawnPoint: [-0.19, 0.80, -9.25]
     },
     {
@@ -23,8 +23,7 @@ const ROOMS = [
         name: "City Center",
         mapImage: "/maps/City 1.jpeg",
         modelPath: "/models/city 1.glb",
-        maxPlayers: 20,
-        scale: 15,
+        maxPlayers: 40,
         spawnPoint: [61.38, 1.24, 3.61]
     },
     {
@@ -32,7 +31,7 @@ const ROOMS = [
         name: "The Hood",
         mapImage: "/maps/Hood.jpeg",
         modelPath: "/models/compressed_1763758312648_hood.glb",
-        maxPlayers: 20,
+        maxPlayers: 40,
         spawnPoint: [-28.14, 0.96, 20.80]
     },
     {
@@ -40,7 +39,7 @@ const ROOMS = [
         name: "Subway Station",
         mapImage: "/maps/Subway.jpg",
         modelPath: "/models/compressed_1763750890387_Subway.glb",
-        maxPlayers: 20,
+        maxPlayers: 40,
         spawnPoint: [43.38, 2.08, 12.65]
     },
     {
@@ -48,7 +47,7 @@ const ROOMS = [
         name: "Abandoned Hospital",
         mapImage: "/maps/Abandonned Hospital.jpeg",
         modelPath: "/models/compressed_1763750895660_Abandonned Hospital.glb",
-        maxPlayers: 20,
+        maxPlayers: 40,
         spawnPoint: [-51.63, 11.06, 21.05]
     }
 ];

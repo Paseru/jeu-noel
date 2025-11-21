@@ -125,8 +125,8 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
         if (!body.current) return
 
         const keys = getKeys()
-        // Disable movement if chat is open
-        const { forward, backward, left, right, jump, run } = isChatOpen
+        // Disable movement if chat is open or settings/menu is open
+        const { forward, backward, left, right, jump, run } = (isChatOpen || isSettingsOpen)
             ? { forward: false, backward: false, left: false, right: false, jump: false, run: false }
             : keys
 

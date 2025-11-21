@@ -43,29 +43,23 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
                         // Ideally we should clone materials if we modify them, but for now we modify in place 
                         // as we want this style globally.
 
-                        if (mat) {
-                            // 1. Clone to avoid side effects
-                            // Note: We are already traversing a cloned scene, but materials might be shared. 
-                            // Ideally we should clone materials if we modify them, but for now we modify in place 
-                            // as we want this style globally.
-
-                            // 2. Darken textures (existing logic)
-                            if (!mat.userData.darkened) {
-                                mat.color.multiplyScalar(0.8)
-                                mat.userData.darkened = true
-                            }
-
-                            // 3. APPLY THE FIX: Alpha Test instead of Transparency
-                            mat.transparent = false // Disable sorting
-                            mat.depthWrite = true   // Force depth write so objects hide what's behind them
-
-                            // If it has a texture, use alpha test to cut out the transparent parts
-                            if (mat.map) {
-                                mat.alphaTest = 0.5
-                                mat.side = THREE.DoubleSide // Ensure leaves are visible from both sides
-                            }
+                        // 2. Darken textures (existing logic)
+                        if (!mat.userData.darkened) {
+                            mat.color.multiplyScalar(0.8)
+                            mat.userData.darkened = true
                         }
-                    })
+
+                        // 3. APPLY THE FIX: Alpha Test instead of Transparency
+                        mat.transparent = false // Disable sorting
+                        mat.depthWrite = true   // Force depth write so objects hide what's behind them
+
+                        // If it has a texture, use alpha test to cut out the transparent parts
+                        if (mat.map) {
+                            mat.alphaTest = 0.5
+                            mat.side = THREE.DoubleSide // Ensure leaves are visible from both sides
+                        }
+                    }
+                })
 
                 const name = child.name.toLowerCase()
                 const isPlantOrTree = name.includes('grass') || name.includes('flower') || name.includes('plant') || name.includes('leaf') || name.includes('vegetation') || name.includes('tree') || name.includes('pine') || name.includes('spruce')
