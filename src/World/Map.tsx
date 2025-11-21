@@ -9,6 +9,16 @@ import { useGameStore } from '../stores/useGameStore'
 const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) => {
     const { scene } = useGLTF(modelPath)
 
+    // DEBUG: Log bounding box
+    useMemo(() => {
+        const box = new THREE.Box3().setFromObject(scene)
+        const size = new THREE.Vector3()
+        box.getSize(size)
+        const center = new THREE.Vector3()
+        box.getCenter(center)
+        console.log("Map Bounds:", { min: box.min, max: box.max, size, center })
+    }, [scene])
+
     console.log("MapContent mounted. ModelPath:", modelPath, "Scale:", scale)
 
 

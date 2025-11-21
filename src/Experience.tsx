@@ -1,4 +1,4 @@
-import { Physics } from '@react-three/rapier'
+import { Physics, RigidBody } from '@react-three/rapier'
 import { PlayerController } from './Player/PlayerController'
 import { Lights } from './World/Lights'
 import { Environment } from './World/Environment'
@@ -33,6 +33,15 @@ export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
                 }>
                     <Map />
                 </ErrorBoundary>
+
+                {/* DEBUG: Safety Floor to catch falling player */}
+                <RigidBody type="fixed" position={[0, -10, 0]}>
+                    <mesh receiveShadow>
+                        <boxGeometry args={[100, 1, 100]} />
+                        <meshStandardMaterial color="red" />
+                    </mesh>
+                </RigidBody>
+
                 <PlayerController isSettingsOpen={isSettingsOpen} />
 
                 {/* Remote Players */}
