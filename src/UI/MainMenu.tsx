@@ -9,7 +9,7 @@ export default function MainMenu({ onOpenSettings }: MainMenuProps) {
     const nickname = useGameStore((state) => state.nickname)
 
     return (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="absolute inset-0 z-[1000] flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
             <div className="text-center mb-12">
                 <h1 className="text-8xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60 drop-shadow-2xl">
                     Frozen Hollow

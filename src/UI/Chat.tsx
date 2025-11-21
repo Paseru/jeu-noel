@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useGameStore } from '../stores/useGameStore'
 
 export default function Chat() {
-    const [isOpen, setIsOpen] = useState(false)
     const [inputValue, setInputValue] = useState('')
     const inputRef = useRef<HTMLInputElement>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -10,37 +9,44 @@ export default function Chat() {
     const messages = useGameStore((state) => state.messages)
     const sendMessage = useGameStore((state) => state.sendMessage)
     const nickname = useGameStore((state) => state.nickname)
+    const isChatOpen = useGameStore((state) => state.isChatOpen)
+    const setChatOpen = useGameStore((state) => state.setChatOpen)
 
     // Auto-scroll to bottom
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages])
 
-    // Handle Enter key to toggle chat
+    // Handle Enter key to toggle chat and Escape to close
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Enter') {
-                if (isOpen) {
+                if (isChatOpen) {
                     // If open and has text, send it
                     if (inputValue.trim()) {
                         sendMessage(inputValue)
                         setInputValue('')
                     }
                     // Close chat (blur input)
-                    setIsOpen(false)
+                    setChatOpen(false)
                     inputRef.current?.blur()
                 } else {
                     // Open chat (focus input)
-                    setIsOpen(true)
+                    setChatOpen(true)
                     // Small timeout to ensure focus works after state update
                     setTimeout(() => inputRef.current?.focus(), 10)
+                }
+            } else if (e.key === 'Escape') {
+                if (isChatOpen) {
+                    setChatOpen(false)
+                    inputRef.current?.blur()
                 }
             }
         }
 
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [isOpen, inputValue, sendMessage])
+    }, [isChatOpen, inputValue, sendMessage, setChatOpen])
 
     return (
         <div className="absolute top-1/2 -translate-y-1/2 left-8 w-80 z-50 flex flex-col gap-2 pointer-events-none">
@@ -56,7 +62,7 @@ export default function Chat() {
             </div>
 
             {/* Input Field */}
-            <div className={`transition-opacity duration-200 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0'}`}>
+            <div className={`transition-opacity duration-200 ${isChatOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0'}`}>
                 <input
                     ref={inputRef}
                     type="text"
@@ -64,7 +70,7 @@ export default function Chat() {
                     onChange={(e) => setInputValue(e.target.value)}
                     placeholder={`Message as ${nickname}...`}
                     className="w-full bg-black/60 backdrop-blur-md text-white px-4 py-2 rounded-lg border border-white/20 focus:border-white/50 outline-none"
-                    onBlur={() => setIsOpen(false)}
+                    onBlur={() => setChatOpen(false)}
                 />
             </div>
         </div>

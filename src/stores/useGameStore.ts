@@ -12,6 +12,11 @@ interface PlayerState {
     characterIndex: number
 }
 
+interface MobileInputState {
+    joystick: { x: number, y: number }
+    lookDelta: { x: number, y: number }
+}
+
 interface ChatMessage {
     id: string
     senderId: string
@@ -28,8 +33,16 @@ interface GameState {
 
     playerId: string | null
     nickname: string
+    isChatOpen: boolean
+
+    // Mobile Controls
+    mobileInput: MobileInputState
+    setJoystick: (x: number, y: number) => void
+    addLookDelta: (x: number, y: number) => void
+    resetLookDelta: () => void
 
     setNickname: (name: string) => void
+    setChatOpen: (isOpen: boolean) => void
     setSpeaking: (isSpeaking: boolean) => void
     startPlaying: () => void
     connectSocket: () => void
@@ -47,8 +60,33 @@ export const useGameStore = create<GameState>((set, get) => ({
     messages: [],
     playerId: null,
     nickname: '',
+    isChatOpen: false,
+
+    mobileInput: {
+        joystick: { x: 0, y: 0 },
+        lookDelta: { x: 0, y: 0 }
+    },
+
+    setJoystick: (x, y) => set((state) => ({
+        mobileInput: { ...state.mobileInput, joystick: { x, y } }
+    })),
+
+    addLookDelta: (x, y) => set((state) => ({
+        mobileInput: {
+            ...state.mobileInput,
+            lookDelta: {
+                x: state.mobileInput.lookDelta.x + x,
+                y: state.mobileInput.lookDelta.y + y
+            }
+        }
+    })),
+
+    resetLookDelta: () => set((state) => ({
+        mobileInput: { ...state.mobileInput, lookDelta: { x: 0, y: 0 } }
+    })),
 
     setNickname: (name) => set({ nickname: name }),
+    setChatOpen: (isOpen) => set({ isChatOpen: isOpen }),
     setSpeaking: (isSpeaking) => {
         const socket = get().socket
         if (socket) {

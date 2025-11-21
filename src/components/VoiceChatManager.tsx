@@ -55,6 +55,7 @@ export default function VoiceChatManager() {
             if (e.code === 'KeyV' && localStreamRef.current) {
                 localStreamRef.current.getAudioTracks().forEach(track => track.enabled = true)
                 setSpeaking(true)
+                useVoiceStore.getState().setMicrophoneActive(true)
             }
         }
 
@@ -62,6 +63,7 @@ export default function VoiceChatManager() {
             if (e.code === 'KeyV' && localStreamRef.current) {
                 localStreamRef.current.getAudioTracks().forEach(track => track.enabled = false)
                 setSpeaking(false)
+                useVoiceStore.getState().setMicrophoneActive(false)
             }
         }
 

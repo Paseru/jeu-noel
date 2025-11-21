@@ -4,8 +4,11 @@ import { KeyboardControls } from '@react-three/drei'
 import { useMemo, Suspense, useState, useRef, useEffect } from 'react'
 import MainMenu from './UI/MainMenu'
 import Chat from './UI/Chat'
+import Settings from './UI/Settings'
+import VoiceIndicator from './UI/VoiceIndicator'
 import VoiceChatManager from './components/VoiceChatManager'
 import { useGameStore } from './stores/useGameStore'
+import MobileControls from './UI/MobileControls'
 
 export default function App() {
     const map = useMemo(() => [
@@ -78,10 +81,17 @@ export default function App() {
                 <>
                     <Chat />
                     <VoiceChatManager />
+                    <VoiceChatManager />
+                    <VoiceIndicator />
+                    <MobileControls />
+
                     <div className="absolute top-0 left-0 w-full p-8 pointer-events-none flex justify-between items-start z-50">
                         {/* Top Left: Settings Button */}
                         <button
-                            onClick={() => setIsSettingsOpen(true)}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                setIsSettingsOpen(true)
+                            }}
                             className="pointer-events-auto bg-white/10 backdrop-blur-md p-3 rounded-full hover:bg-white/20 transition-all group"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-white group-hover:rotate-90 transition-transform">
@@ -102,73 +112,12 @@ export default function App() {
             )}
 
             {/* Settings Modal */}
-            {isSettingsOpen && (
-                <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                    <div className="bg-[#1c1c2e] border border-white/10 p-8 rounded-2xl w-96 shadow-2xl">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold text-white">Settings</h2>
-                            <button
-                                onClick={() => setIsSettingsOpen(false)}
-                                className="text-white/50 hover:text-white transition-colors"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        <div className="space-y-6">
-                            {/* Volume Control */}
-                            <div>
-                                <div className="flex justify-between text-white mb-2">
-                                    <span className="text-sm font-medium">Music</span>
-                                    <span className="text-sm text-white/50">{Math.round(volume * 100)}%</span>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="1"
-                                    step="0.01"
-                                    value={volume}
-                                    onChange={(e) => setVolume(parseFloat(e.target.value))}
-                                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white hover:accent-gray-200"
-                                />
-                            </div>
-
-                            {/* Controls Guide */}
-                            <div className="pt-6 border-t border-white/10">
-                                <h3 className="text-white font-bold mb-4 text-lg">Controls</h3>
-                                <div className="space-y-3 text-sm text-white/80">
-                                    <div className="flex justify-between items-center">
-                                        <span>Move</span>
-                                        <span className="font-mono text-xs bg-white/10 px-2 py-1 rounded text-white/70">WASD / Arrows</span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span>Run</span>
-                                        <span className="font-mono text-xs bg-white/10 px-2 py-1 rounded text-white/70">Shift</span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span>Jump</span>
-                                        <span className="font-mono text-xs bg-white/10 px-2 py-1 rounded text-white/70">Space</span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span>Talk (Hold)</span>
-                                        <span className="font-mono text-xs bg-white/10 px-2 py-1 rounded text-white/70">V</span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span>Chat</span>
-                                        <span className="font-mono text-xs bg-white/10 px-2 py-1 rounded text-white/70">Enter</span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span>Change View</span>
-                                        <span className="font-mono text-xs bg-white/10 px-2 py-1 rounded text-white/70">C</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <Settings
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
+                volume={volume}
+                setVolume={setVolume}
+            />
         </KeyboardControls>
     )
 }

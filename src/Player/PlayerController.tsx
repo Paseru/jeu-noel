@@ -17,7 +17,7 @@ interface PlayerControllerProps {
 }
 
 export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
-    const { socket, phase } = useGameStore()
+    const { socket, phase, isChatOpen, mobileInput, resetLookDelta } = useGameStore()
     const body = useRef<RapierRigidBody>(null!)
     const [subscribeKeys, getKeys] = useKeyboardControls()
     const { camera } = useThree()
@@ -65,32 +65,41 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
         const unsubscribe = subscribeKeys(
             (state) => state.toggleView,
             (value) => {
-                if (value) {
+                if (value && !isChatOpen) {
                     setCameraMode((prev) => (prev === 'FIRST' ? 'THIRD' : 'FIRST'))
                 }
             }
         )
         return unsubscribe
-    }, [subscribeKeys])
+    }, [subscribeKeys, isChatOpen])
+
+    // Jump Logic
+    const lastJumpTime = useRef(0)
 
     useFrame((_state, delta) => {
         if (!body.current) return
 
-        const { forward, backward, left, right, jump, run } = getKeys()
+        const keys = getKeys()
+        // Disable movement if chat is open
+        const { forward, backward, left, right, jump, run } = isChatOpen
+            ? { forward: false, backward: false, left: false, right: false, jump: false, run: false }
+            : keys
+
+        const { joystick, lookDelta } = mobileInput
 
         const velocity = body.current.linvel()
         const translation = body.current.translation()
 
         // Movement Logic
+        const sideVector = new THREE.Vector3(
+            (left ? 1 : 0) - (right ? 1 : 0) - joystick.x,
+            0,
+            0
+        )
         const frontVector = new THREE.Vector3(
             0,
             0,
-            (backward ? 1 : 0) - (forward ? 1 : 0)
-        )
-        const sideVector = new THREE.Vector3(
-            (left ? 1 : 0) - (right ? 1 : 0),
-            0,
-            0
+            (backward ? 1 : 0) - (forward ? 1 : 0) + joystick.y
         )
         const direction = new THREE.Vector3()
 
@@ -101,6 +110,21 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             .applyEuler(camera.rotation) // Use camera for direction so it's responsive
 
         body.current.setLinvel({ x: direction.x, y: velocity.y, z: direction.z }, true)
+
+        // Apply Camera Rotation from Touch
+        if (lookDelta.x !== 0 || lookDelta.y !== 0) {
+            const SENSITIVITY = 0.002
+            camera.rotation.y -= lookDelta.x * SENSITIVITY
+            // Clamp pitch? For now just simple yaw/pitch
+            // Actually, PointerLockControls usually handles this.
+            // If we are using PointerLockControls, we might fight it.
+            // But on mobile, PointerLockControls might not be active or we might need to manually rotate the camera object.
+            // Let's try modifying camera.rotation directly first.
+
+            // Note: PointerLockControls modifies camera.rotation.
+
+            resetLookDelta()
+        }
 
         // Update Animation State
         const moving = direction.length() > 0.1
@@ -117,7 +141,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             const bobOffset = moving ? Math.sin(bobState.current) * 0.1 : 0
 
             // First person: Camera matches player position
-            camera.position.set(translation.x, translation.y + 1.1 + bobOffset, translation.z)
+            camera.position.set(translation.x, translation.y + 1 + bobOffset, translation.z)
         } else {
             // Third Person Camera (Orbit)
             // 1. Get the camera's current rotation (controlled by PointerLockControls)
@@ -197,15 +221,19 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
 
         // Jump Logic
         if (jump) {
-            // Simple ground check: raycast down
-            const origin = body.current.translation()
-            origin.y -= 0.65 // Start slightly below center
-            const ray = new rapier.Ray(origin, { x: 0, y: -1, z: 0 })
-            const hit = world.castRay(ray, 0.5, true)
+            const now = Date.now()
+            if (now - lastJumpTime.current > 1000) { // 1 second cooldown
+                // Simple ground check: raycast down
+                const origin = body.current.translation()
+                origin.y -= 0.65 // Start slightly below center
+                const ray = new rapier.Ray(origin, { x: 0, y: -1, z: 0 })
+                const hit = world.castRay(ray, 0.5, true)
 
-            // Only jump if grounded AND not already moving up fast (prevents double jump / flying)
-            if (hit && hit.timeOfImpact < 0.2 && Math.abs(velocity.y) < 0.5) {
-                body.current.setLinvel({ x: velocity.x, y: JUMP_FORCE, z: velocity.z }, true)
+                // Only jump if grounded AND not already moving up fast (prevents double jump / flying)
+                if (hit && hit.timeOfImpact < 0.2 && Math.abs(velocity.y) < 0.5) {
+                    body.current.setLinvel({ x: velocity.x, y: JUMP_FORCE, z: velocity.z }, true)
+                    lastJumpTime.current = now
+                }
             }
         }
     })
@@ -222,8 +250,8 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
         >
             <CapsuleCollider args={[0.5, 0.3]} />
 
-            {/* Controls: Only active if settings are CLOSED and we are PLAYING */}
-            {!isSettingsOpen && phase === 'PLAYING' && (
+            {/* Controls: Only active if settings are CLOSED and we are PLAYING and Chat is CLOSED */}
+            {!isSettingsOpen && !isChatOpen && phase === 'PLAYING' && (
                 <PointerLockControls />
             )}
 
@@ -234,6 +262,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
                         characterIndex={characterIndex.current}
                         isMoving={isMoving}
                         isRunning={isRunning}
+                        showNameplate={false}
                     />
                 </group>
             )}

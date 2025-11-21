@@ -84,6 +84,20 @@ io.on("connection", (socket) => {
         }
     });
 
+    // Handle Chat Messages
+    socket.on("chatMessage", (text) => {
+        if (players[socket.id]) {
+            const message = {
+                id: Date.now().toString(), // Simple ID generation
+                senderId: socket.id,
+                senderName: players[socket.id].nickname,
+                text: text,
+                timestamp: Date.now()
+            };
+            io.emit("chatMessage", message);
+        }
+    });
+
     // Handle disconnect
     socket.on("disconnect", () => {
         console.log("Player disconnected:", socket.id);
