@@ -1,1 +1,4 @@
-*.glb filter=lfs diff=lfs merge=lfs -text
+# Large files (>100MB) require LFS
+Abandonned\ Hospital.glb filter=lfs diff=lfs merge=lfs -text
+Subway.glb filter=lfs diff=lfs merge=lfs -text
+Workshop.glb filter=lfs diff=lfs merge=lfs -text
