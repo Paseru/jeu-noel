@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useGameStore } from '../stores/useGameStore'
 
-export function MainMenu() {
+interface MainMenuProps {
+    onOpenSettings: () => void
+}
+
+export function MainMenu({ onOpenSettings }: MainMenuProps) {
     const [nickname, setNickname] = useState('')
     const [view, setView] = useState<'nickname' | 'serverList'>('nickname')
     const { setNickname: setStoreNickname, joinRoom, fetchRooms, rooms } = useGameStore()
@@ -60,6 +64,13 @@ export function MainMenu() {
                             `}
                         >
                             PLAY
+                        </button>
+
+                        <button
+                            onClick={onOpenSettings}
+                            className="w-full py-3 rounded-xl font-bold text-lg tracking-widest transition-all duration-200 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white border border-white/5 hover:border-white/20"
+                        >
+                            SETTINGS
                         </button>
                     </div>
                 ) : (
