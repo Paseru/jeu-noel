@@ -38,6 +38,7 @@ interface Room {
     scale?: number
     spawnPoint?: [number, number, number]
     zombieSpawnPoint?: [number, number, number]
+    summonPoint?: [number, number, number]
 }
 
 interface GatherState {

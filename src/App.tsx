@@ -181,13 +181,13 @@ export default function App() {
             {/* Background Music */}
             <audio
                 ref={menuAudioRef}
-                src="/sounds/(Free) Horror Ambiance - Ominous Background Music.mp3"
+                src="/sounds/John Carpenter Halloween Theme [Movie Version Extended by Gilles Nuytens].mp3"
                 loop
                 preload="auto"
             />
             <audio
                 ref={gameAudioRef}
-                src="/sounds/John Carpenter Halloween Theme [Movie Version Extended by Gilles Nuytens].mp3"
+                src="/sounds/(Free) Horror Ambiance - Ominous Background Music.mp3"
                 loop
                 preload="auto"
             />

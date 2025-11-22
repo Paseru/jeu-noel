@@ -30,7 +30,7 @@ export const ZombieSummonZone = () => {
 
     const spawnPoint = useMemo(() => {
         const room = rooms.find(r => r.id === currentRoomId)
-        return room?.zombieSpawnPoint || room?.spawnPoint || null
+        return room?.summonPoint || room?.zombieSpawnPoint || room?.spawnPoint || null
     }, [rooms, currentRoomId])
 
     const circleCenter = useMemo(() => {

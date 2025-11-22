@@ -17,7 +17,8 @@ const ROOMS = [
         modelPath: "/models/snowy_village_ps1_environment.glb",
         maxPlayers: 40,
         spawnPoint: [1.98, 9.55, -11.47],
-        zombieSpawnPoint: [47.74, 13.03, -140.37]
+        zombieSpawnPoint: [47.74, 13.03, -140.37],
+        summonPoint: [-4.67, 0.80, -20.92]
     },
     {
         id: "server-tacos",
