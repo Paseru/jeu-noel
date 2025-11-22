@@ -24,6 +24,7 @@ interface ZombieProps {
 }
 
 export function Zombie({ spawnPoint }: ZombieProps) {
+    const { currentRoomId, rooms } = useGameStore()
     const bodyRef = useRef<RapierRigidBody>(null!)
     const modelRef = useRef<Group>(null)
     const { scene, animations } = useGLTF('/models/zombies/terror_engine_-_psycho_zombie.glb')
@@ -40,6 +41,9 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         return clip?.duration || 1.167
     }, [animations])
     const zombieSoundRef = useRef<PositionalAudio | null>(null)
+    const agonyBufferRef = useRef<AudioBuffer | null>(null)
+    const wasCloseRef = useRef<boolean>(false)
+    const [navMeshPath, setNavMeshPath] = useState<string>(NAVMESH_PATH)
     const [navMeshGeometry, setNavMeshGeometry] = useState<THREE.BufferGeometry | null>(null)
     const pathfinderRef = useRef<any | null>(null)
     const pathRef = useRef<THREE.Vector3[]>([])
@@ -48,6 +52,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
     const lastReplanRef = useRef<number>(0)
     const stuckCounterRef = useRef<number>(0)
     const lastPosRef = useRef<THREE.Vector3 | null>(null)
+    const lockIdRef = useRef<string>(`zombie-lock-${Math.random().toString(36).slice(2)}`)
 
     // Helper to find actions by partial name (case insensitive)
     const findAction = (name: string) => {
@@ -131,12 +136,49 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         }
     }, [])
 
+    // Preload player agony sound once (used when a zombie reaches the player)
+    useEffect(() => {
+        const loader = new AudioLoader()
+        loader.load('/sounds/player/death/agonie.mp3', (buffer) => {
+            agonyBufferRef.current = buffer
+        })
+    }, [])
+
+    // Clean up any locks if the zombie gets unmounted
+    useEffect(() => {
+        return () => {
+            if (wasCloseRef.current) {
+                useGameStore.getState().unlockMovement(lockIdRef.current)
+                useGameStore.getState().releaseCameraMode(lockIdRef.current)
+            }
+        }
+    }, [])
+
+    // Adapter le chemin du navmesh à la map courante
+    useEffect(() => {
+        const room = rooms.find(r => r.id === currentRoomId)
+        const model = room?.modelPath?.toLowerCase() || ''
+
+        let path = NAVMESH_PATH
+        if (model.includes('taco')) path = '/navmesh/navmesh_tacos.glb'
+        else if (model.includes('snow')) path = '/navmesh/navmesh.glb'
+        else if (model) {
+            const base = model.split('/').pop()?.replace(/\.(gltf|glb)$/i, '') || 'navmesh'
+            path = `/navmesh/${base}.glb`
+        }
+
+        setNavMeshPath(path)
+        setNavMeshGeometry(null)
+        pathfinderRef.current = null
+    }, [currentRoomId, rooms])
+
     // Navmesh loading (silencieux si le fichier est absent)
     useEffect(() => {
         let cancelled = false
+        if (!navMeshPath) return
         const loader = new GLTFLoader()
         loader.load(
-            NAVMESH_PATH,
+            navMeshPath,
             (gltf) => {
                 if (cancelled) return
                 const mesh = gltf.scene.getObjectByProperty('type', 'Mesh') as THREE.Mesh | null
@@ -154,7 +196,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         return () => {
             cancelled = true
         }
-    }, [])
+    }, [navMeshPath])
 
     // Construire le pathfinder une fois le navmesh chargé
     useEffect(() => {
@@ -258,6 +300,11 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         const players = useGameStore.getState().players as Record<string, { position: [number, number, number] }>
         const localId = useGameStore.getState().playerId
         const setPlayerDead = useGameStore.getState().setPlayerDead
+        const lockMovement = useGameStore.getState().lockMovement
+        const unlockMovement = useGameStore.getState().unlockMovement
+        const forceCameraMode = useGameStore.getState().forceCameraMode
+        const releaseCameraMode = useGameStore.getState().releaseCameraMode
+        const sfxVolume = useGameStore.getState().volumes.sfx
         let nearest: { id: string, position: [number, number, number] } | null = null
         let minDist = Infinity
 
@@ -274,6 +321,11 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         })
 
         if (!nearest) {
+            if (wasCloseRef.current) {
+                unlockMovement(lockIdRef.current)
+                releaseCameraMode(lockIdRef.current)
+                wasCloseRef.current = false
+            }
             playState('idle')
             body.setLinvel({ x: 0, y: body.linvel().y, z: 0 }, true)
             return
@@ -287,6 +339,40 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         const targetVector = new THREE.Vector3(targetPos[0], pos.y, targetPos[2])
         const dir = targetVector.clone().sub(currentPosVector)
         const flatLen = Math.hypot(dir.x, dir.z)
+        const isLocalTarget = nearestTarget.id === localId
+        const withinAttackRange = flatLen < ATTACK_RANGE
+
+        // Lock local player controls & force 3rd person when grabbed
+        if (isLocalTarget && withinAttackRange) {
+            lockMovement(lockIdRef.current)
+            forceCameraMode('THIRD', lockIdRef.current)
+
+            // Play agony sound once when entering the grab range
+            if (!wasCloseRef.current) {
+                const listener = useVoiceStore.getState().audioListener
+                if (listener && agonyBufferRef.current) {
+                    const sound = new PositionalAudio(listener)
+                    sound.setBuffer(agonyBufferRef.current)
+                    sound.setLoop(false)
+                    sound.setVolume(0.8 * sfxVolume)
+                    sound.setRefDistance(1.5)
+                    sound.setMaxDistance(12)
+                    sound.setRolloffFactor(1.5)
+                    sound.position.set(targetPos[0], targetPos[1], targetPos[2])
+                    modelRef.current?.add(sound)
+                    sound.play()
+                    sound.source?.addEventListener('ended', () => {
+                        sound.disconnect()
+                        modelRef.current?.remove(sound)
+                    })
+                }
+            }
+            wasCloseRef.current = true
+        } else if (wasCloseRef.current) {
+            unlockMovement(lockIdRef.current)
+            releaseCameraMode(lockIdRef.current)
+            wasCloseRef.current = false
+        }
 
         // ---------------------------------------------------------
         // ATTACK LOGIC
@@ -332,7 +418,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         }
 
         // Attempt to start attack if in range
-        if (flatLen < ATTACK_RANGE) {
+        if (withinAttackRange) {
             playState('attack')
             // If we successfully switched to attack, return to stop movement logic for this frame
             // (We rely on the next frame to catch 'currentState === attack')
