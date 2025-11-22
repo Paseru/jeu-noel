@@ -43,6 +43,8 @@ interface GameState {
     setPhase: (phase: 'MENU' | 'PLAYING') => void
     socket: Socket | null
     players: Record<string, PlayerState>
+    isPlayerDead: boolean
+    setPlayerDead: (dead: boolean) => void
     messages: ChatMessage[]
     rooms: Room[]
     currentRoomId: string | null
@@ -107,6 +109,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     setPhase: (phase) => set({ phase }),
     socket: null,
     players: {},
+    isPlayerDead: false,
+    setPlayerDead: (dead) => set({ isPlayerDead: dead }),
     messages: [],
     rooms: [],
     currentRoomId: null,
@@ -283,7 +287,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         const socket = get().socket
         if (socket) {
             socket.emit('joinRoom', { roomId, nickname: get().nickname })
-            set({ phase: 'PLAYING', currentRoomId: roomId })
+            set({ phase: 'PLAYING', currentRoomId: roomId, isPlayerDead: false })
         }
     },
 

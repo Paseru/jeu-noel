@@ -23,9 +23,10 @@ export const ZombieManager = () => {
         setZombies([])
     }, [currentRoomId])
 
-    // Whenever spawnNonce increments, add a zombie at the current room spawn point
+    // Whenever spawnNonce increments (user pressed spawn), add a zombie
     useEffect(() => {
         if (!currentSpawnPoint) return
+        if (spawnNonce === 0) return // skip initial mount
         setZombies((prev) => [
             ...prev,
             { id: Date.now(), spawnPoint: currentSpawnPoint }

@@ -9,6 +9,7 @@ import { useGameStore } from '../stores/useGameStore'
 
 const RUN_SPEED = 3.6
 const ATTACK_RANGE = 1.0
+const ATTACK_EARLY_TIME = 1.0 // seconds of anticipation
 
 type ZombieState = 'idle' | 'run' | 'attack'
 
@@ -67,10 +68,12 @@ export function Zombie({ spawnPoint }: ZombieProps) {
 
         // Pick nearest player (includes self thanks to setLocalPlayerTransform)
         const players = useGameStore.getState().players as Record<string, { position: [number, number, number] }>
-        let nearest: { position: [number, number, number] } | null = null
+        const localId = useGameStore.getState().playerId
+        const setPlayerDead = useGameStore.getState().setPlayerDead
+        let nearest: { id: string, position: [number, number, number] } | null = null
         let minDist = Infinity
 
-        Object.values(players).forEach(p => {
+        Object.entries(players).forEach(([id, p]) => {
             const d = Math.hypot(
                 p.position[0] - pos.x,
                 p.position[1] - pos.y,
@@ -78,7 +81,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
             )
             if (d < minDist) {
                 minDist = d
-                nearest = p
+                nearest = { id, position: p.position }
             }
         })
 
@@ -88,16 +91,27 @@ export function Zombie({ spawnPoint }: ZombieProps) {
             return
         }
 
+        const nearestTarget = nearest as { id: string, position: [number, number, number] }
+
         // Direction on XZ plane
-        const targetPos = (nearest as { position: [number, number, number] }).position
+        const targetPos = nearestTarget.position
         const target = new THREE.Vector3(targetPos[0], pos.y, targetPos[2])
         const dir = target.clone().sub(new THREE.Vector3(pos.x, pos.y, pos.z))
         const flatLen = Math.hypot(dir.x, dir.z)
 
+        // Trigger damage only when actually in range
         if (flatLen < ATTACK_RANGE) {
             playState('attack')
             body.setLinvel({ x: 0, y: body.linvel().y, z: 0 }, true)
+            if (nearestTarget.id === localId && !useGameStore.getState().isPlayerDead) {
+                setPlayerDead(true)
+            }
             return
+        }
+
+        // Start attack animation a bit earlier while approaching (same hit zone)
+        if (flatLen < ATTACK_RANGE + RUN_SPEED * ATTACK_EARLY_TIME) {
+            playState('attack')
         }
 
         // Normalized forward direction
@@ -150,8 +164,8 @@ export function Zombie({ spawnPoint }: ZombieProps) {
             position={spawnPoint}
             enabledRotations={[false, false, false]}
         >
-            <CapsuleCollider args={[0.9, 0.35]} />
-            <group ref={modelRef} position={[0, -0.9, 0]} scale={1.15}>
+            <CapsuleCollider args={[0.8, 0.32]} />
+            <group ref={modelRef} position={[0, -1.05, 0]} scale={0.92}>
                 <primitive object={cloneScene} />
             </group>
         </RigidBody>

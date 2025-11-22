@@ -14,6 +14,7 @@ import MobileControls from './UI/MobileControls'
 import { ZombieSpawnButton } from './components/ZombieSpawnButton'
 import { InteractionPrompt } from './UI/InteractionPrompt'
 import PlayerList from './UI/PlayerList'
+import { DeathScreen } from './UI/DeathScreen'
 
 export default function App() {
     const map = useMemo(() => [
@@ -138,7 +139,7 @@ export default function App() {
         setIsPlayerListOpen(false)
         // Disconnect/Leave room logic could go here if needed
         // For now just switch phase to MENU
-        useGameStore.setState({ phase: 'MENU', currentRoomId: null })
+        useGameStore.setState({ phase: 'MENU', currentRoomId: null, isPlayerDead: false })
     }
 
     return (
@@ -196,6 +197,9 @@ export default function App() {
                     )}
                 </>
             )}
+
+            {/* Death Overlay (on top of everything) */}
+            <DeathScreen />
 
             {/* Settings Modal */}
             <Settings
