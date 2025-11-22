@@ -53,6 +53,8 @@ export function Zombie({ spawnPoint }: ZombieProps) {
     const stuckCounterRef = useRef<number>(0)
     const lastPosRef = useRef<THREE.Vector3 | null>(null)
     const lockIdRef = useRef<string>(`zombie-lock-${Math.random().toString(36).slice(2)}`)
+    const lastWpDistRef = useRef<number | null>(null)
+    const noImproveCounterRef = useRef<number>(0)
 
     // Helper to find actions by partial name (case insensitive)
     const findAction = (name: string) => {
@@ -210,16 +212,27 @@ export function Zombie({ spawnPoint }: ZombieProps) {
     const replanPath = (start: THREE.Vector3, target: THREE.Vector3) => {
         const pf = pathfinderRef.current
         if (!pf) return false
-        const group = pf.getGroup(NAV_ZONE_ID, start)
-        if (group === null || group === undefined) return false
-        const path = pf.findPath(start, target, NAV_ZONE_ID, group) as THREE.Vector3[] | null
+        // Trouver un groupe valide même si le point est légèrement hors navmesh
+        let group = pf.getGroup(NAV_ZONE_ID, start)
+        if (group === null || group === undefined) {
+            const anyGroup = pf.getGroup(NAV_ZONE_ID, pf.getRandomNode(NAV_ZONE_ID, 0, start, 5) || start)
+            group = anyGroup ?? 0
+        }
+
+        // Projeter start/target sur le navmesh pour éviter un path nul
+        const closestStart = pf.getClosestNode(start, NAV_ZONE_ID, group, false)?.centroid || start
+        const closestTarget = pf.getClosestNode(target, NAV_ZONE_ID, group, false)?.centroid || target
+
+        const path = pf.findPath(closestStart, closestTarget, NAV_ZONE_ID, group) as THREE.Vector3[] | null
         if (path && path.length > 0) {
             pathRef.current = path
             waypointIndexRef.current = 0
             lastTargetRef.current = target.clone()
             lastReplanRef.current = performance.now()
+            console.info('[Zombie] navmesh active', navMeshPath, 'len', path.length)
             return true
         }
+        console.warn('[Zombie] navmesh path failed, fallback to raycast')
         return false
     }
 
@@ -245,6 +258,21 @@ export function Zombie({ spawnPoint }: ZombieProps) {
             base.clone().add(right.clone().multiplyScalar(0.35)),
             base.clone().add(right.clone().multiplyScalar(-0.35))
         ]
+
+        // Check collision droit devant pour déclencher un pivot franc
+        let frontHitDist = Infinity
+        let frontHitNormal: THREE.Vector3 | null = null
+        {
+            const ray = new rapier.Ray(
+                new rapier.Vector3(base.x, base.y, base.z),
+                new rapier.Vector3(dir.x, 0, dir.z)
+            )
+            const hit = world.castRayAndGetNormal(ray, 1.4, true, undefined, undefined, undefined, excludeRigidBodyHandle) as any
+            if (hit) {
+                frontHitDist = hit.toi
+                if (hit.normal) frontHitNormal = new THREE.Vector3(hit.normal.x, 0, hit.normal.z).normalize()
+            }
+        }
 
         for (const angle of angles) {
             const testDir = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle)
@@ -280,6 +308,16 @@ export function Zombie({ spawnPoint }: ZombieProps) {
                 const slide = testDir.clone().projectOnPlane(hitNormal).normalize()
                 candidate = slide.lengthSq() > 0 ? slide : testDir
                 score -= 0.3
+            }
+
+            // Pivot d'urgence si un obstacle est très proche devant
+            if (frontHitDist < 0.7 && frontHitNormal) {
+                const left = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2)
+                const right = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2)
+                // Choisir côté le plus opposé à la normale
+                const goLeft = left.dot(frontHitNormal) < right.dot(frontHitNormal)
+                candidate = goLeft ? left.normalize() : right.normalize()
+                score = 5 // force la priorité
             }
             if (score > bestScore) {
                 bestScore = score
@@ -458,6 +496,22 @@ export function Zombie({ spawnPoint }: ZombieProps) {
             const toWaypoint = waypoint.clone().sub(currentPosVector)
             toWaypoint.y = 0
             const distWp = toWaypoint.length()
+            // Mesure de progrès vers le waypoint pour détecter blocage
+            if (lastWpDistRef.current !== null && distWp > lastWpDistRef.current - 0.05) {
+                noImproveCounterRef.current += 1
+            } else {
+                noImproveCounterRef.current = 0
+            }
+            lastWpDistRef.current = distWp
+
+            if (noImproveCounterRef.current > 30) { // ~0.5s à 60fps
+                replanPath(currentPosVector, targetVec3)
+                waypointIndexRef.current = 0
+                noImproveCounterRef.current = 0
+                // petit pivot pour décrocher
+                desiredDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.random() > 0.5 ? Math.PI / 2 : -Math.PI / 2)
+            }
+
             if (distWp < 0.35 && waypointIndexRef.current < pathRef.current.length - 1) {
                 waypointIndexRef.current += 1
             }
