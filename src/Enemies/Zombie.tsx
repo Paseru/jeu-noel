@@ -142,11 +142,13 @@ export function Zombie({ spawnPoint }: ZombieProps) {
                 const mesh = gltf.scene.getObjectByProperty('type', 'Mesh') as THREE.Mesh | null
                 if (mesh?.geometry) {
                     setNavMeshGeometry(mesh.geometry.clone())
+                } else {
+                    console.warn('[Zombie] navmesh loaded but no mesh found in glb')
                 }
             },
             undefined,
-            () => {
-                // ignore errors : pas de navmesh dispo => on restera en fallback raycast
+            (err: any) => {
+                console.warn('[Zombie] navmesh not found, fallback to raycast avoidance', err)
             }
         )
         return () => {
@@ -182,27 +184,60 @@ export function Zombie({ spawnPoint }: ZombieProps) {
     // Calcul direction avec évitement local + slide
     const steerWithAvoidance = (
         dir: THREE.Vector3,
-        origin: any,
-        world: any
+        pos: { x: number, y: number, z: number },
+        world: any,
+        excludeRigidBodyHandle?: number
     ) => {
         const angles = [0, Math.PI / 6, -Math.PI / 6, Math.PI / 3, -Math.PI / 3]
         let bestDir = dir.clone()
         let bestScore = -Infinity
+
+        // Points de départ des rayons: centre + épaules pour sentir les piliers
+        const upOffset = 0.4
+        const base = new THREE.Vector3(pos.x, pos.y + upOffset, pos.z)
+        const right = new THREE.Vector3(dir.z, 0, -dir.x)
+        if (right.lengthSq() < 1e-5) right.set(1, 0, 0)
+        right.normalize()
+        const origins = [
+            base,
+            base.clone().add(right.clone().multiplyScalar(0.35)),
+            base.clone().add(right.clone().multiplyScalar(-0.35))
+        ]
+
         for (const angle of angles) {
             const testDir = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle)
-            const ray = new rapier.Ray(origin, new rapier.Vector3(testDir.x, 0, testDir.z))
-            const hit = world.castRayAndGetNormal(ray, 2.2, true) as any
+            let closestHit = 3
+            let hitNormal: THREE.Vector3 | null = null
 
-            let score = 2.2 - Math.abs(angle) * 0.5
-            let candidate = testDir
-            if (hit) {
-                score = hit.toi - Math.abs(angle) * 0.5
-                if (hit.toi < 0.8 && hit.normal) {
-                    const n = new THREE.Vector3(hit.normal.x, 0, hit.normal.z).normalize()
-                    const slide = testDir.clone().projectOnPlane(n).normalize()
-                    candidate = slide.lengthSq() > 0 ? slide : testDir
-                    score -= 0.4 // on pénalise les directions trop proches du mur
+            for (const o of origins) {
+                const ray = new rapier.Ray(
+                    new rapier.Vector3(o.x, o.y, o.z),
+                    new rapier.Vector3(testDir.x, 0, testDir.z)
+                )
+                // Exclure le corps du zombie pour éviter l'auto-hit
+                const hit = world.castRayAndGetNormal(
+                    ray,
+                    2.4,
+                    true,
+                    undefined,
+                    undefined,
+                    undefined,
+                    excludeRigidBodyHandle
+                ) as any
+                if (hit && hit.toi < closestHit) {
+                    closestHit = hit.toi
+                    if (hit.normal) {
+                        hitNormal = new THREE.Vector3(hit.normal.x, 0, hit.normal.z).normalize()
+                    }
                 }
+            }
+
+            let score = closestHit - Math.abs(angle) * 0.5
+            let candidate = testDir
+            if (hitNormal && closestHit < 0.9) {
+                const slide = testDir.clone().projectOnPlane(hitNormal).normalize()
+                candidate = slide.lengthSq() > 0 ? slide : testDir
+                score -= 0.3
             }
             if (score > bestScore) {
                 bestScore = score
@@ -218,7 +253,6 @@ export function Zombie({ spawnPoint }: ZombieProps) {
 
         // Current position
         const pos = body.translation()
-        const origin = new rapier.Vector3(pos.x, pos.y + 0.4, pos.z)
 
         // Pick nearest player (includes self thanks to setLocalPlayerTransform)
         const players = useGameStore.getState().players as Record<string, { position: [number, number, number] }>
@@ -364,7 +398,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         lastPosRef.current = currentPosVector.clone()
 
         // Évitement local + slide sur normale
-        desiredDir = steerWithAvoidance(desiredDir, origin, world)
+        desiredDir = steerWithAvoidance(desiredDir, pos, world, body.handle)
 
         const hasDir = desiredDir.lengthSq() > 0.0001
 
