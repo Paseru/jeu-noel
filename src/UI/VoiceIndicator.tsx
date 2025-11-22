@@ -6,7 +6,7 @@ export default function VoiceIndicator() {
     return (
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 pointer-events-none">
             {/* Hint Text */}
-            <span className={`text-white font-mono text-sm tracking-widest uppercase transition-opacity duration-200 ${isMicrophoneActive ? 'opacity-100' : 'opacity-30'}`}>
+            <span className={`text-white font-mono text-sm tracking-widest uppercase transition-opacity duration-200 hidden lg:block ${isMicrophoneActive ? 'opacity-100' : 'opacity-30'}`}>
                 Press V to talk
             </span>
 

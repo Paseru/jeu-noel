@@ -130,7 +130,11 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             ? { forward: false, backward: false, left: false, right: false, jump: false, run: false }
             : keys
 
-        const { joystick, lookDelta } = mobileInput
+        const { joystick, lookDelta, isJumping, isRunning: isMobileRunning } = mobileInput
+
+        // Combine keyboard and mobile inputs
+        const jump = keys.jump || isJumping
+        const run = keys.run || isMobileRunning
 
         const velocity = body.current.linvel()
         const translation = body.current.translation()

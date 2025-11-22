@@ -175,7 +175,7 @@ export default function App() {
                     <VoiceChatManager />
                     <VoiceIndicator />
                     {!isSettingsOpen && !isPauseMenuOpen && !isPlayerListOpen && (
-                        <MobileControls onOpenSettings={() => setIsSettingsOpen(true)} />
+                        <MobileControls onOpenMenu={() => setIsPauseMenuOpen(true)} />
                     )}
 
                     <InteractionPrompt />

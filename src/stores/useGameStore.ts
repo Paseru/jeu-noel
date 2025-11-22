@@ -15,6 +15,8 @@ interface PlayerState {
 interface MobileInputState {
     joystick: { x: number, y: number }
     lookDelta: { x: number, y: number }
+    isJumping: boolean
+    isRunning: boolean
 }
 
 interface ChatMessage {
@@ -54,6 +56,8 @@ interface GameState {
     setJoystick: (x: number, y: number) => void
     addLookDelta: (x: number, y: number) => void
     resetLookDelta: () => void
+    setMobileJump: (isJumping: boolean) => void
+    setMobileRun: (isRunning: boolean) => void
 
     myCharacterIndex: number
     setMyCharacterIndex: (index: number) => void
@@ -115,7 +119,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     mobileInput: {
         joystick: { x: 0, y: 0 },
-        lookDelta: { x: 0, y: 0 }
+        lookDelta: { x: 0, y: 0 },
+        isJumping: false,
+        isRunning: false
     },
 
     setJoystick: (x, y) => set((state) => ({
@@ -134,6 +140,14 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     resetLookDelta: () => set((state) => ({
         mobileInput: { ...state.mobileInput, lookDelta: { x: 0, y: 0 } }
+    })),
+
+    setMobileJump: (isJumping) => set((state) => ({
+        mobileInput: { ...state.mobileInput, isJumping }
+    })),
+
+    setMobileRun: (isRunning) => set((state) => ({
+        mobileInput: { ...state.mobileInput, isRunning }
     })),
 
     // My Character Index (Assigned by Server)
