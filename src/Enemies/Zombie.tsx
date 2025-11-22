@@ -155,69 +155,106 @@ export function Zombie({ spawnPoint }: ZombieProps) {
 
         // Direction on XZ plane
         const targetPos = nearestTarget.position
-        const target = new THREE.Vector3(targetPos[0], pos.y, targetPos[2])
-        const dir = target.clone().sub(new THREE.Vector3(pos.x, pos.y, pos.z))
+        const currentPosVector = new THREE.Vector3(pos.x, pos.y, pos.z)
+        const targetVector = new THREE.Vector3(targetPos[0], pos.y, targetPos[2])
+        const dir = targetVector.clone().sub(currentPosVector)
         const flatLen = Math.hypot(dir.x, dir.z)
 
-        // Trigger attack when in range (death is applied mid-animation)
-        if (flatLen < ATTACK_RANGE) {
-            if (currentState !== 'attack') {
-                playState('attack')
-            } else if (attackStartRef.current === null) {
-                // Ensure we still have a start time even if lock prevented a restart
-                attackStartRef.current = performance.now()
-                attackDurationRef.current = attackClipDuration
-                attackAppliedRef.current = false
+        // ---------------------------------------------------------
+        // ATTACK LOGIC
+        // ---------------------------------------------------------
+        
+        // If we are currently attacking, handle the animation/damage lifecycle
+        if (currentState === 'attack') {
+            // Look at player while attacking (optional, but good for realism)
+            // dir is not normalized yet, but we can use it
+            if (modelRef.current) {
+                const lookDir = dir.clone().normalize()
+                const targetQuat = new THREE.Quaternion()
+                targetQuat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(lookDir.x, lookDir.z))
+                modelRef.current.quaternion.slerp(targetQuat, 0.1)
             }
-            body.setLinvel({ x: 0, y: body.linvel().y, z: 0 }, true)
-        } else {
-            // Reset attack progress if we leave range
-            attackStartRef.current = null
-            attackAppliedRef.current = false
-        }
 
-        // Apply damage halfway through the attack animation if still in range
-        if (
-            attackStartRef.current !== null &&
-            !attackAppliedRef.current
-        ) {
-            const elapsed = (performance.now() - attackStartRef.current) / 1000
-            const triggerTime = attackDurationRef.current * 0.5
-            if (elapsed >= triggerTime && flatLen < ATTACK_RANGE) {
-                attackAppliedRef.current = true
-                if (nearestTarget.id === localId && !useGameStore.getState().isPlayerDead) {
-                    setPlayerDead(true)
-                    if (document.pointerLockElement) document.exitPointerLock()
+            // Stop movement
+            body.setLinvel({ x: 0, y: body.linvel().y, z: 0 }, true)
+
+            if (attackStartRef.current !== null) {
+                const elapsed = (performance.now() - attackStartRef.current) / 1000
+                
+                // Attempt damage halfway through
+                if (!attackAppliedRef.current && elapsed >= attackDurationRef.current * 0.4) {
+                    // Check hit range (slightly forgiving)
+                    if (flatLen < ATTACK_RANGE + 0.5) {
+                        attackAppliedRef.current = true
+                        if (nearestTarget.id === localId && !useGameStore.getState().isPlayerDead) {
+                            setPlayerDead(true)
+                            if (document.pointerLockElement) document.exitPointerLock()
+                        }
+                    }
+                }
+
+                // End attack when animation finishes
+                if (elapsed >= attackDurationRef.current) {
+                    playState('run')
                 }
             }
-            // If animation finished with no hit, unlock to chase again
-            if (elapsed >= attackDurationRef.current) {
-                attackStartRef.current = null
-                attackAppliedRef.current = false
-            }
+            
+            // Skip movement logic while attacking
+            return
         }
+
+        // Attempt to start attack if in range
+        if (flatLen < ATTACK_RANGE) {
+            playState('attack')
+            // If we successfully switched to attack, return to stop movement logic for this frame
+            // (We rely on the next frame to catch 'currentState === attack')
+            // However, playState might fail due to lock. 
+            // If it failed (still 'run' or 'idle'), we should probably stop or idle if we are VERY close.
+            
+            // Check if switch happened (using a small delay or just assuming logic holds)
+            // Ideally playState would return success. 
+            // Let's just verify state in next frame. But for this frame, if we are that close, stop moving.
+            body.setLinvel({ x: 0, y: body.linvel().y, z: 0 }, true)
+            return 
+        }
+
+        // ---------------------------------------------------------
+        // MOVEMENT LOGIC
+        // ---------------------------------------------------------
+        playState('run')
 
         // Normalized forward direction
         dir.y = 0
         dir.normalize()
 
-        // Obstacle avoidance: sample three rays (forward, 30° left/right) and pick the freest
-        const sampleDirs = [
-            dir.clone(),
-            dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 6),
-            dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 6),
-        ]
+        // Obstacle avoidance: more rays for better navigation
+        // Angles: 0, +/- 30, +/- 60
+        const angles = [0, Math.PI / 6, -Math.PI / 6, Math.PI / 3, -Math.PI / 3]
         let bestDir = dir.clone()
         let bestScore = -Infinity
-        sampleDirs.forEach(d => {
-            const ray = new rapier.Ray(origin, new rapier.Vector3(d.x, 0, d.z))
-            const hit = world.castRay(ray, 1.6, true) as any
-            const score = hit ? hit.toi : 2 // farther is better
+
+        for (const angle of angles) {
+            const testDir = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle)
+            const ray = new rapier.Ray(origin, new rapier.Vector3(testDir.x, 0, testDir.z))
+            // Cast ray slightly further to anticipate
+            const hit = world.castRay(ray, 2.5, true) as any
+            
+            // Score: Higher is better.
+            // If no hit, score is max (e.g. 10).
+            // If hit, score is the distance (toi).
+            // We penalize large angles slightly to prefer straight path if open.
+            let distance = hit ? hit.toi : 3.0
+            
+            // Simple heuristic: Score = Distance - (AnglePenalty)
+            // Angle penalty: 0 for straight, higher for sides.
+            const anglePenalty = Math.abs(angle) * 0.5
+            const score = distance - anglePenalty
+
             if (score > bestScore) {
                 bestScore = score
-                bestDir = d
+                bestDir = testDir
             }
-        })
+        }
 
         const moveDir = bestDir.normalize()
 
@@ -227,8 +264,6 @@ export function Zombie({ spawnPoint }: ZombieProps) {
             y: body.linvel().y,
             z: moveDir.z * RUN_SPEED
         }, true)
-
-        playState('run')
 
         // Rotate visual model toward movement direction
         if (modelRef.current && moveDir.lengthSq() > 0.0001) {
