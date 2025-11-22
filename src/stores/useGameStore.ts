@@ -51,6 +51,14 @@ interface GameState {
     zombies: Zombie[]
     isPlayerDead: boolean
     setPlayerDead: (dead: boolean) => void
+    movementLocked: boolean
+    movementLockSources: string[]
+    lockMovement: (source: string) => void
+    unlockMovement: (source: string) => void
+    forcedCameraMode: 'FIRST' | 'THIRD' | null
+    cameraForceSources: string[]
+    forceCameraMode: (mode: 'FIRST' | 'THIRD', source: string) => void
+    releaseCameraMode: (source: string) => void
     mapLoaded: boolean
     setMapLoaded: (loaded: boolean) => void
     messages: ChatMessage[]
@@ -125,6 +133,33 @@ export const useGameStore = create<GameState>((set, get) => ({
     zombies: [],
     isPlayerDead: false,
     setPlayerDead: (dead) => set({ isPlayerDead: dead }),
+    movementLocked: false,
+    movementLockSources: [],
+    lockMovement: (source) => set((state) => {
+        if (state.movementLockSources.includes(source)) return state
+        const movementLockSources = [...state.movementLockSources, source]
+        return { movementLockSources, movementLocked: true }
+    }),
+    unlockMovement: (source) => set((state) => {
+        if (!state.movementLockSources.includes(source)) return state
+        const movementLockSources = state.movementLockSources.filter((s) => s !== source)
+        return { movementLockSources, movementLocked: movementLockSources.length > 0 }
+    }),
+    forcedCameraMode: null,
+    cameraForceSources: [],
+    forceCameraMode: (mode, source) => set((state) => {
+        const exists = state.cameraForceSources.includes(source)
+        const cameraForceSources = exists ? state.cameraForceSources : [...state.cameraForceSources, source]
+        return { forcedCameraMode: mode, cameraForceSources }
+    }),
+    releaseCameraMode: (source) => set((state) => {
+        if (!state.cameraForceSources.includes(source)) return state
+        const cameraForceSources = state.cameraForceSources.filter((s) => s !== source)
+        return {
+            cameraForceSources,
+            forcedCameraMode: cameraForceSources.length > 0 ? state.forcedCameraMode : null
+        }
+    }),
     mapLoaded: false,
     setMapLoaded: (loaded) => set({ mapLoaded: loaded }),
     messages: [],
@@ -344,7 +379,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     spawnZombie: () => {
         const socket = get().socket
         const roomId = get().currentRoomId
-        if (socket && roomId) {
+        if (!roomId) {
+            console.warn('[spawnZombie] ignored: no room joined')
+            return
+        }
+        if (socket) {
+            console.log('[spawnZombie] request for room', roomId)
             socket.emit('spawnZombie')
         }
     },

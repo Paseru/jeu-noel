@@ -12,7 +12,7 @@ import { useGameStore } from '../stores/useGameStore'
 import { useVoiceStore } from '../stores/useVoiceStore'
 import { AudioLoader, PositionalAudio } from 'three'
 
-const RUN_SPEED = 3.6
+const RUN_SPEED = 5
 const ATTACK_RANGE = 1.0
 const NAVMESH_PATH = '/navmesh/navmesh.glb'
 const NAV_ZONE_ID = 'level'

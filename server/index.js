@@ -33,6 +33,8 @@ let roomZombies = {}; // { roomId: [{ id, spawnPoint }] }
 let nextCharacterIndex = 1;
 
 const STALE_PLAYER_MS = 15000; // remove players that haven't heartbeat'ed for 15s
+const ZOMBIE_COOLDOWN_MS = 1500; // throttle spawn requests per socket
+const lastSpawnBySocket = {}; // { socketId: timestamp }
 
 io.on("connection", (socket) => {
     console.log("New connection:", socket.id);
@@ -150,6 +152,12 @@ io.on("connection", (socket) => {
     socket.on("spawnZombie", () => {
         const player = players[socket.id];
         if (!player) return;
+        const now = Date.now();
+        const last = lastSpawnBySocket[socket.id] || 0;
+        if (now - last < ZOMBIE_COOLDOWN_MS) {
+            return; // spam guard
+        }
+        lastSpawnBySocket[socket.id] = now;
         const room = ROOMS.find(r => r.id === player.roomId);
         const spawnPoint = room?.spawnPoint || [0, 2, 0];
         const zombie = {
@@ -159,6 +167,7 @@ io.on("connection", (socket) => {
         if (!roomZombies[player.roomId]) roomZombies[player.roomId] = [];
         roomZombies[player.roomId].push(zombie);
         io.to(player.roomId).emit("zombieSpawned", zombie);
+        console.log(`Zombie spawned in ${player.roomId} by ${socket.id} @`, spawnPoint);
     });
 
     // Handle WebRTC Signaling

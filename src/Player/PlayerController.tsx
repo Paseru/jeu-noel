@@ -43,7 +43,8 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     const [isRunning, setIsRunning] = useState(false)
     const mapLoaded = useGameStore((state) => state.mapLoaded)
     const wasMapLoaded = useRef(false)
-    const isPlayerDead = useGameStore((state) => state.isPlayerDead)
+    const movementLocked = useGameStore((state) => state.movementLocked)
+    const forcedCameraMode = useGameStore((state) => state.forcedCameraMode)
 
     // Debug / Fly Mode
     const [flyMode, setFlyMode] = useState(false)
@@ -51,6 +52,13 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
 
     const setAudioListener = useVoiceStore((state) => state.setAudioListener)
     const audioListener = useVoiceStore((state) => state.audioListener)
+
+    // Keep local camera in sync with forced mode (e.g., when a zombie grabs the player)
+    useEffect(() => {
+        if (forcedCameraMode && forcedCameraMode !== cameraMode) {
+            setCameraMode(forcedCameraMode)
+        }
+    }, [forcedCameraMode, cameraMode])
 
     // Audio Listener (The "Ears" of the player)
     useEffect(() => {
@@ -92,8 +100,9 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (isChatOpen) return
 
-            // Toggle View (C)
+            // Toggle View (C) disabled when a forced camera mode is active
             if (e.code === 'KeyC') {
+                if (forcedCameraMode) return
                 setCameraMode((prev) => (prev === 'FIRST' ? 'THIRD' : 'FIRST'))
             }
 
@@ -136,28 +145,6 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     // Jump Logic
     const lastJumpTime = useRef(0)
 
-    // Player death sound (positional)
-    useEffect(() => {
-        if (!isPlayerDead || !audioListener || !body.current) return
-        const loader = new AudioLoader()
-        loader.load('/sounds/player/death/agonie.mp3', (buffer) => {
-            const sound = new ThreePositionalAudio(audioListener)
-            sound.setBuffer(buffer)
-            sound.setLoop(false)
-            sound.setVolume(0.8 * useGameStore.getState().volumes.sfx)
-            sound.setRefDistance(1.5)
-            sound.setMaxDistance(18)
-            const pos = body.current!.translation()
-            sound.position.set(pos.x, pos.y, pos.z)
-            scene.add(sound)
-            sound.play()
-            sound.source?.addEventListener('ended', () => {
-                scene.remove(sound)
-                sound.disconnect()
-            })
-        })
-    }, [isPlayerDead, audioListener, scene])
-
     useFrame((_state, delta) => {
         if (!body.current) return
 
@@ -187,7 +174,8 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
 
         const keys = getKeys()
         // Disable movement if chat is open or settings/menu is open
-        const { forward, backward, left, right, jump: keyJump, run: keyRun } = (isChatOpen || isSettingsOpen)
+        const controlsLocked = isChatOpen || isSettingsOpen || movementLocked
+        const { forward, backward, left, right, jump: keyJump, run: keyRun } = controlsLocked
             ? { forward: false, backward: false, left: false, right: false, jump: false, run: false }
             : keys
 
