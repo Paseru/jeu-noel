@@ -291,7 +291,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         const socket = get().socket
         if (socket) {
             socket.emit('joinRoom', { roomId, nickname: get().nickname })
-            set({ phase: 'PLAYING', currentRoomId: roomId, isPlayerDead: false })
+            set({ phase: 'PLAYING', currentRoomId: roomId, isPlayerDead: false, mapLoaded: false })
         }
     },
 

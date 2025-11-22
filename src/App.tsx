@@ -15,6 +15,7 @@ import { ZombieSpawnButton } from './components/ZombieSpawnButton'
 import { InteractionPrompt } from './UI/InteractionPrompt'
 import PlayerList from './UI/PlayerList'
 import { DeathScreen } from './UI/DeathScreen'
+import Loader from './UI/Loader'
 
 export default function App() {
     const map = useMemo(() => [
@@ -32,7 +33,7 @@ export default function App() {
     const [isPlayerListOpen, setIsPlayerListOpen] = useState(false)
     const audioRef = useRef<HTMLAudioElement>(null)
 
-    const { phase, volumes } = useGameStore()
+    const { phase, volumes, mapLoaded } = useGameStore()
 
     useEffect(() => {
         if (audioRef.current) {
@@ -178,8 +179,11 @@ export default function App() {
                 <MainMenu onOpenSettings={() => setIsSettingsOpen(true)} />
             )}
 
+            {/* Loader */}
+            {phase === 'PLAYING' && !mapLoaded && <Loader />}
+
             {/* UI Overlay (Only when playing) */}
-            {phase === 'PLAYING' && (
+            {phase === 'PLAYING' && mapLoaded && (
                 <>
                     <Chat />
                     <VoiceChatManager />
