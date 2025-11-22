@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useGameStore } from '../stores/useGameStore'
 
 export const DeathScreen = () => {
-    const { setPhase, setPlayerDead, isPlayerDead, setMapLoaded } = useGameStore()
+    const { leaveRoom, isPlayerDead } = useGameStore()
 
     // Keep pointer unlocked and cursor visible once dead
     useEffect(() => {
@@ -15,10 +15,7 @@ export const DeathScreen = () => {
     if (!isPlayerDead) return null
 
     const handleBackToMenu = () => {
-        setPlayerDead(false)
-        setPhase('MENU')
-        setMapLoaded(false)
-        useGameStore.setState({ currentRoomId: null })
+        leaveRoom() // also resets isPlayerDead, players, zombies and phase
     }
 
     return (
@@ -32,13 +29,13 @@ export const DeathScreen = () => {
                     GAME OVER
                 </h1>
                 <p className="text-white/60 font-mono text-sm">
-                    Le zombie t&apos;a eu. Retourne au menu pour relancer une partie.
+                    The zombie got you.
                 </p>
                 <button
                     onClick={handleBackToMenu}
                     className="group relative inline-flex items-center justify-center px-8 py-3 bg-white text-black font-bold text-lg rounded-full hover:scale-105 transition-all duration-200 shadow-[0_0_35px_rgba(255,255,255,0.25)]"
                 >
-                    <span className="relative z-10">Retour au menu</span>
+                    <span className="relative z-10">Back to menu</span>
                     <div className="absolute inset-0 rounded-full bg-white blur-md opacity-50 group-hover:opacity-80 transition-opacity" />
                 </button>
             </div>

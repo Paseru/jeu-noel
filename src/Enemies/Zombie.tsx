@@ -5,12 +5,17 @@ import { CapsuleCollider, RigidBody, RapierRigidBody, useRapier } from '@react-t
 import { Group } from 'three'
 import * as THREE from 'three'
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+// @ts-ignore three-pathfinding n'a pas de typings TS
+import { Pathfinding } from 'three-pathfinding'
 import { useGameStore } from '../stores/useGameStore'
 import { useVoiceStore } from '../stores/useVoiceStore'
 import { AudioLoader, PositionalAudio } from 'three'
 
 const RUN_SPEED = 3.6
 const ATTACK_RANGE = 1.0
+const NAVMESH_PATH = '/navmesh/navmesh.glb'
+const NAV_ZONE_ID = 'level'
 
 type ZombieState = 'idle' | 'run' | 'attack'
 
@@ -35,6 +40,14 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         return clip?.duration || 1.167
     }, [animations])
     const zombieSoundRef = useRef<PositionalAudio | null>(null)
+    const [navMeshGeometry, setNavMeshGeometry] = useState<THREE.BufferGeometry | null>(null)
+    const pathfinderRef = useRef<any | null>(null)
+    const pathRef = useRef<THREE.Vector3[]>([])
+    const waypointIndexRef = useRef<number>(0)
+    const lastTargetRef = useRef<THREE.Vector3 | null>(null)
+    const lastReplanRef = useRef<number>(0)
+    const stuckCounterRef = useRef<number>(0)
+    const lastPosRef = useRef<THREE.Vector3 | null>(null)
 
     // Helper to find actions by partial name (case insensitive)
     const findAction = (name: string) => {
@@ -99,9 +112,9 @@ export function Zombie({ spawnPoint }: ZombieProps) {
             sound.setBuffer(buffer)
             sound.setLoop(true)
             sound.setVolume(0.4)
-            sound.setRefDistance(2.5)
-            sound.setMaxDistance(28)
-            sound.setRolloffFactor(1)
+            sound.setRefDistance(1.5)
+            sound.setMaxDistance(10)
+            sound.setRolloffFactor(2)
             if (modelRef.current) {
                 modelRef.current.add(sound)
             }
@@ -117,6 +130,87 @@ export function Zombie({ spawnPoint }: ZombieProps) {
             }
         }
     }, [])
+
+    // Navmesh loading (silencieux si le fichier est absent)
+    useEffect(() => {
+        let cancelled = false
+        const loader = new GLTFLoader()
+        loader.load(
+            NAVMESH_PATH,
+            (gltf) => {
+                if (cancelled) return
+                const mesh = gltf.scene.getObjectByProperty('type', 'Mesh') as THREE.Mesh | null
+                if (mesh?.geometry) {
+                    setNavMeshGeometry(mesh.geometry.clone())
+                }
+            },
+            undefined,
+            () => {
+                // ignore errors : pas de navmesh dispo => on restera en fallback raycast
+            }
+        )
+        return () => {
+            cancelled = true
+        }
+    }, [])
+
+    // Construire le pathfinder une fois le navmesh chargé
+    useEffect(() => {
+        if (!navMeshGeometry) return
+        const pf = new Pathfinding()
+        const zone = Pathfinding.createZone(navMeshGeometry)
+        pf.setZoneData(NAV_ZONE_ID, zone)
+        pathfinderRef.current = pf
+    }, [navMeshGeometry])
+
+    const replanPath = (start: THREE.Vector3, target: THREE.Vector3) => {
+        const pf = pathfinderRef.current
+        if (!pf) return false
+        const group = pf.getGroup(NAV_ZONE_ID, start)
+        if (group === null || group === undefined) return false
+        const path = pf.findPath(start, target, NAV_ZONE_ID, group) as THREE.Vector3[] | null
+        if (path && path.length > 0) {
+            pathRef.current = path
+            waypointIndexRef.current = 0
+            lastTargetRef.current = target.clone()
+            lastReplanRef.current = performance.now()
+            return true
+        }
+        return false
+    }
+
+    // Calcul direction avec évitement local + slide
+    const steerWithAvoidance = (
+        dir: THREE.Vector3,
+        origin: any,
+        world: any
+    ) => {
+        const angles = [0, Math.PI / 6, -Math.PI / 6, Math.PI / 3, -Math.PI / 3]
+        let bestDir = dir.clone()
+        let bestScore = -Infinity
+        for (const angle of angles) {
+            const testDir = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle)
+            const ray = new rapier.Ray(origin, new rapier.Vector3(testDir.x, 0, testDir.z))
+            const hit = world.castRayAndGetNormal(ray, 2.2, true) as any
+
+            let score = 2.2 - Math.abs(angle) * 0.5
+            let candidate = testDir
+            if (hit) {
+                score = hit.toi - Math.abs(angle) * 0.5
+                if (hit.toi < 0.8 && hit.normal) {
+                    const n = new THREE.Vector3(hit.normal.x, 0, hit.normal.z).normalize()
+                    const slide = testDir.clone().projectOnPlane(n).normalize()
+                    candidate = slide.lengthSq() > 0 ? slide : testDir
+                    score -= 0.4 // on pénalise les directions trop proches du mur
+                }
+            }
+            if (score > bestScore) {
+                bestScore = score
+                bestDir = candidate
+            }
+        }
+        return bestDir.normalize()
+    }
 
     useFrame(() => {
         const body = bodyRef.current
@@ -223,52 +317,68 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         // ---------------------------------------------------------
         playState('run')
 
-        // Normalized forward direction
         dir.y = 0
-        dir.normalize()
+        const dirNorm = dir.lengthSq() > 0 ? dir.normalize() : new THREE.Vector3(0, 0, 0)
+        let desiredDir = dirNorm.clone()
 
-        // Obstacle avoidance: more rays for better navigation
-        // Angles: 0, +/- 30, +/- 60
-        const angles = [0, Math.PI / 6, -Math.PI / 6, Math.PI / 3, -Math.PI / 3]
-        let bestDir = dir.clone()
-        let bestScore = -Infinity
+        // Replan si navmesh dispo et cible a bougé / pas de path / path épuisé
+        const targetVec3 = new THREE.Vector3(targetPos[0], pos.y, targetPos[2])
+        const now = performance.now()
+        const targetMoved = lastTargetRef.current ? lastTargetRef.current.distanceTo(targetVec3) > 1 : true
+        const pathEmpty = pathRef.current.length === 0 || waypointIndexRef.current >= pathRef.current.length
+        const replanCooldown = now - lastReplanRef.current > 1500
+        if (pathfinderRef.current && (targetMoved || pathEmpty || replanCooldown)) {
+            replanPath(currentPosVector, targetVec3)
+        }
 
-        for (const angle of angles) {
-            const testDir = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle)
-            const ray = new rapier.Ray(origin, new rapier.Vector3(testDir.x, 0, testDir.z))
-            // Cast ray slightly further to anticipate
-            const hit = world.castRay(ray, 2.5, true) as any
-            
-            // Score: Higher is better.
-            // If no hit, score is max (e.g. 10).
-            // If hit, score is the distance (toi).
-            // We penalize large angles slightly to prefer straight path if open.
-            let distance = hit ? hit.toi : 3.0
-            
-            // Simple heuristic: Score = Distance - (AnglePenalty)
-            // Angle penalty: 0 for straight, higher for sides.
-            const anglePenalty = Math.abs(angle) * 0.5
-            const score = distance - anglePenalty
-
-            if (score > bestScore) {
-                bestScore = score
-                bestDir = testDir
+        // Suivi de waypoint si path navmesh
+        if (pathRef.current.length > 0 && waypointIndexRef.current < pathRef.current.length) {
+            const waypoint = pathRef.current[waypointIndexRef.current]
+            const toWaypoint = waypoint.clone().sub(currentPosVector)
+            toWaypoint.y = 0
+            const distWp = toWaypoint.length()
+            if (distWp < 0.35 && waypointIndexRef.current < pathRef.current.length - 1) {
+                waypointIndexRef.current += 1
+            }
+            if (distWp > 0.05) {
+                desiredDir = toWaypoint.normalize()
             }
         }
 
-        const moveDir = bestDir.normalize()
+        // Anti stuck : si on ne bouge pas, on replanifie et on ajoute une légère dérive
+        if (lastPosRef.current) {
+            const moved = currentPosVector.clone().sub(lastPosRef.current).lengthSq()
+            if (moved < 0.0004) {
+                stuckCounterRef.current += 1
+                if (stuckCounterRef.current > 45) {
+                    replanPath(currentPosVector, targetVec3)
+                    waypointIndexRef.current = 0
+                    stuckCounterRef.current = 0
+                    // petit pivot aléatoire pour se décrocher
+                    desiredDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.random() > 0.5 ? Math.PI / 2 : -Math.PI / 2)
+                }
+            } else {
+                stuckCounterRef.current = 0
+            }
+        }
+        lastPosRef.current = currentPosVector.clone()
+
+        // Évitement local + slide sur normale
+        desiredDir = steerWithAvoidance(desiredDir, origin, world)
+
+        const hasDir = desiredDir.lengthSq() > 0.0001
 
         // Apply velocity
         body.setLinvel({
-            x: moveDir.x * RUN_SPEED,
+            x: hasDir ? desiredDir.x * RUN_SPEED : 0,
             y: body.linvel().y,
-            z: moveDir.z * RUN_SPEED
+            z: hasDir ? desiredDir.z * RUN_SPEED : 0
         }, true)
 
         // Rotate visual model toward movement direction
-        if (modelRef.current && moveDir.lengthSq() > 0.0001) {
+        if (modelRef.current && hasDir) {
             const targetQuat = new THREE.Quaternion()
-            targetQuat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(moveDir.x, moveDir.z))
+            targetQuat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(desiredDir.x, desiredDir.z))
             modelRef.current.quaternion.slerp(targetQuat, 0.2)
         }
     })
