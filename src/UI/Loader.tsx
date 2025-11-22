@@ -9,10 +9,16 @@ export default function Loader() {
     return (
         <div className="absolute inset-0 z-[2000] flex flex-col items-center justify-center bg-black text-white overflow-hidden">
             {/* Background Image with Blur */}
-            <div 
-                className="absolute inset-0 bg-cover bg-center opacity-50 blur-sm scale-110 animate-[pulse_4s_ease-in-out_infinite]"
-                style={{ backgroundImage: `url(${room.mapImage})` }}
-            />
+            <div className="absolute inset-0 overflow-hidden">
+                <img 
+                    src={room.mapImage} 
+                    alt={room.name}
+                    className="w-full h-full object-cover opacity-50 blur-sm scale-110 animate-[pulse_4s_ease-in-out_infinite]"
+                    onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://placehold.co/1920x1080/1a1a1a/FFF?text=Loading';
+                    }}
+                />
+            </div>
             
             {/* Dark Overlay */}
             <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/90" />
