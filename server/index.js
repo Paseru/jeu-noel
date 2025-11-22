@@ -36,6 +36,27 @@ const STALE_PLAYER_MS = 15000; // remove players that haven't heartbeat'ed for 1
 const ZOMBIE_COOLDOWN_MS = 1500; // throttle spawn requests per socket
 const lastSpawnBySocket = {}; // { socketId: timestamp }
 
+const clearZombiesForRoom = (roomId, reason) => {
+    if (roomZombies[roomId]?.length) {
+        roomZombies[roomId] = [];
+        io.to(roomId).emit("zombiesCleared");
+        console.log(`Cleared zombies in ${roomId}: ${reason}`);
+    }
+};
+
+const evaluateRoomState = (roomId) => {
+    const roomPlayers = Object.values(players).filter(p => p.roomId === roomId);
+    if (roomPlayers.length === 0) {
+        clearZombiesForRoom(roomId, "room empty");
+        return;
+    }
+
+    const alivePlayers = roomPlayers.filter(p => !p.isDead);
+    if (alivePlayers.length === 0) {
+        clearZombiesForRoom(roomId, "all players dead");
+    }
+};
+
 io.on("connection", (socket) => {
     console.log("New connection:", socket.id);
 
@@ -51,7 +72,9 @@ io.on("connection", (socket) => {
             console.log("Player disconnected/removed:", socket.id);
             const roomId = player.roomId;
             delete players[socket.id];
+            delete lastSpawnBySocket[socket.id];
             io.to(roomId).emit("playerDisconnected", socket.id);
+            evaluateRoomState(roomId);
         }
     };
 
@@ -90,6 +113,7 @@ io.on("connection", (socket) => {
             quaternion: [0, 0, 0, 1],
             isMoving: false,
             isRunning: false,
+            isDead: false,
             characterIndex: assignedCharacterIndex,
             isSpeaking: false,
             nickname: nickname || "Player",
@@ -129,7 +153,7 @@ io.on("connection", (socket) => {
     // Handle player movement
     socket.on("playerMove", (data) => {
         const player = players[socket.id];
-        if (player) {
+        if (player && !player.isDead) {
             touchPlayer();
             player.position = data.position;
             player.quaternion = data.quaternion;
@@ -148,10 +172,18 @@ io.on("connection", (socket) => {
         }
     });
 
+    socket.on("playerDead", () => {
+        const player = players[socket.id];
+        if (!player || player.isDead) return;
+        player.isDead = true;
+        io.to(player.roomId).emit("updatePlayerState", player);
+        evaluateRoomState(player.roomId);
+    });
+
     // Spawn zombie for the player's current room
     socket.on("spawnZombie", () => {
         const player = players[socket.id];
-        if (!player) return;
+        if (!player || player.isDead) return;
         const now = Date.now();
         const last = lastSpawnBySocket[socket.id] || 0;
         if (now - last < ZOMBIE_COOLDOWN_MS) {
@@ -227,6 +259,7 @@ setInterval(() => {
             const roomId = player.roomId;
             delete players[id];
             io.to(roomId).emit("playerDisconnected", id);
+            evaluateRoomState(roomId);
         }
     });
 }, 5000);

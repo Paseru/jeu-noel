@@ -297,7 +297,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         const pos = body.translation()
 
         // Pick nearest player (includes self thanks to setLocalPlayerTransform)
-        const players = useGameStore.getState().players as Record<string, { position: [number, number, number] }>
+        const players = useGameStore.getState().players as Record<string, { position: [number, number, number], isDead?: boolean }>
         const localId = useGameStore.getState().playerId
         const setPlayerDead = useGameStore.getState().setPlayerDead
         const lockMovement = useGameStore.getState().lockMovement
@@ -309,6 +309,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         let minDist = Infinity
 
         Object.entries(players).forEach(([id, p]) => {
+            if (!p || p.isDead) return
             const d = Math.hypot(
                 p.position[0] - pos.x,
                 p.position[1] - pos.y,

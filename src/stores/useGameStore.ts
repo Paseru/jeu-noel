@@ -10,6 +10,7 @@ interface PlayerState {
     nickname: string
     isSpeaking?: boolean
     characterIndex: number
+    isDead?: boolean
 }
 
 interface MobileInputState {
@@ -132,7 +133,21 @@ export const useGameStore = create<GameState>((set, get) => ({
     players: {},
     zombies: [],
     isPlayerDead: false,
-    setPlayerDead: (dead) => set({ isPlayerDead: dead }),
+    setPlayerDead: (dead) => {
+        const socket = get().socket
+        const playerId = get().playerId
+        if (dead && socket) {
+            socket.emit('playerDead')
+        }
+
+        set((state) => {
+            const players = { ...state.players }
+            if (playerId && players[playerId]) {
+                players[playerId] = { ...players[playerId], isDead: dead }
+            }
+            return { isPlayerDead: dead, players }
+        })
+    },
     movementLocked: false,
     movementLockSources: [],
     lockMovement: (source) => set((state) => {
@@ -314,6 +329,10 @@ export const useGameStore = create<GameState>((set, get) => ({
             set((state) => ({ zombies: [...state.zombies, zombie] }))
         })
 
+        socket.on('zombiesCleared', () => {
+            set({ zombies: [] })
+        })
+
         socket.on('playerSpeaking', ({ id, isSpeaking }) => {
             set((state) => {
                 if (!state.players[id]) return state
@@ -365,6 +384,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         const socket = get().socket
         if (socket) {
             socket.emit('leaveRoom')
+            socket.disconnect()
         }
         set({
             phase: 'MENU',
@@ -372,13 +392,20 @@ export const useGameStore = create<GameState>((set, get) => ({
             players: {},
             zombies: [],
             isPlayerDead: false,
-            mapLoaded: false
+            mapLoaded: false,
+            socket: null,
+            playerId: null
         })
     },
 
     spawnZombie: () => {
         const socket = get().socket
         const roomId = get().currentRoomId
+        const isPlayerDead = get().isPlayerDead
+        if (isPlayerDead) {
+            console.warn('[spawnZombie] ignored: player is dead')
+            return
+        }
         if (!roomId) {
             console.warn('[spawnZombie] ignored: no room joined')
             return
@@ -422,6 +449,7 @@ export const useGameStore = create<GameState>((set, get) => ({
             players: {
                 ...state.players,
                 [playerId]: {
+                    ...existing,
                     id: playerId,
                     position,
                     quaternion,
