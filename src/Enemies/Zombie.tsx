@@ -6,6 +6,8 @@ import { Group } from 'three'
 import * as THREE from 'three'
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { useGameStore } from '../stores/useGameStore'
+import { useVoiceStore } from '../stores/useVoiceStore'
+import { AudioLoader, PositionalAudio } from 'three'
 
 const RUN_SPEED = 3.6
 const ATTACK_RANGE = 1.0
@@ -32,6 +34,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         const clip = animations.find(a => a.name.toLowerCase().includes('attack'))
         return clip?.duration || 1.167
     }, [animations])
+    const zombieSoundRef = useRef<PositionalAudio | null>(null)
 
     // Helper to find actions by partial name (case insensitive)
     const findAction = (name: string) => {
@@ -81,6 +84,38 @@ export function Zombie({ spawnPoint }: ZombieProps) {
     useEffect(() => {
         playState('idle')
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
+    // Looping zombie growl (positional)
+    useEffect(() => {
+        const listener = useVoiceStore.getState().audioListener
+        if (!listener) return
+        const loader = new AudioLoader()
+        let disposed = false
+        loader.load('/sounds/zombie/zombie sound.mp3', (buffer) => {
+            if (disposed) return
+            const sound = new PositionalAudio(listener)
+            zombieSoundRef.current = sound
+            sound.setBuffer(buffer)
+            sound.setLoop(true)
+            sound.setVolume(0.4)
+            sound.setRefDistance(2.5)
+            sound.setMaxDistance(28)
+            sound.setRolloffFactor(1)
+            if (modelRef.current) {
+                modelRef.current.add(sound)
+            }
+            sound.play()
+        })
+
+        return () => {
+            disposed = true
+            if (zombieSoundRef.current) {
+                zombieSoundRef.current.stop()
+                zombieSoundRef.current.disconnect()
+                zombieSoundRef.current = null
+            }
+        }
     }, [])
 
     useFrame(() => {

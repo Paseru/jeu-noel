@@ -43,6 +43,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     const [isRunning, setIsRunning] = useState(false)
     const mapLoaded = useGameStore((state) => state.mapLoaded)
     const wasMapLoaded = useRef(false)
+    const isPlayerDead = useGameStore((state) => state.isPlayerDead)
 
     // Debug / Fly Mode
     const [flyMode, setFlyMode] = useState(false)
@@ -57,6 +58,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     }, [socket])
 
     const setAudioListener = useVoiceStore((state) => state.setAudioListener)
+    const audioListener = useVoiceStore((state) => state.audioListener)
 
     // Audio Listener (The "Ears" of the player)
     useEffect(() => {
@@ -71,8 +73,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
 
     // Preload positional footstep buffers once listener is ready
     useEffect(() => {
-        const listener = useVoiceStore.getState().audioListener
-        if (!listener) return
+        if (!audioListener) return
         const loader = new AudioLoader()
         const buffers: AudioBuffer[] = []
         let mounted = true
@@ -85,7 +86,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             })
         })
         return () => { mounted = false }
-    }, [])
+    }, [audioListener])
 
     // Toggle View & Debug Fly Mode
     useEffect(() => {
@@ -142,6 +143,28 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
 
     // Jump Logic
     const lastJumpTime = useRef(0)
+
+    // Player death sound (positional)
+    useEffect(() => {
+        if (!isPlayerDead || !audioListener || !body.current) return
+        const loader = new AudioLoader()
+        loader.load('/sounds/player/death/agonie.mp3', (buffer) => {
+            const sound = new ThreePositionalAudio(audioListener)
+            sound.setBuffer(buffer)
+            sound.setLoop(false)
+            sound.setVolume(0.8 * useGameStore.getState().volumes.sfx)
+            sound.setRefDistance(1.5)
+            sound.setMaxDistance(18)
+            const pos = body.current!.translation()
+            sound.position.set(pos.x, pos.y, pos.z)
+            scene.add(sound)
+            sound.play()
+            sound.source?.addEventListener('ended', () => {
+                scene.remove(sound)
+                sound.disconnect()
+            })
+        })
+    }, [isPlayerDead, audioListener, scene])
 
     useFrame((_state, delta) => {
         if (!body.current) return
