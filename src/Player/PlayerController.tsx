@@ -12,6 +12,7 @@ const JUMP_FORCE = 6
 const FLY_SPEED = 15 // Faster speed for flying
 
 import CharacterModel from './CharacterModel'
+import { PositionalAudio as ThreePositionalAudio, AudioLoader } from 'three'
 
 interface PlayerControllerProps {
     isSettingsOpen: boolean
@@ -21,7 +22,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     const { socket, phase, isChatOpen, mobileInput, resetLookDelta, addChatMessage } = useGameStore()
     const body = useRef<RapierRigidBody>(null!)
     const [subscribeKeys, getKeys] = useKeyboardControls()
-    const { camera } = useThree()
+    const { camera, scene } = useThree()
     const { rapier, world } = useRapier()
 
     // Reference to the character mesh group for rotation
@@ -45,6 +46,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
 
     // Debug / Fly Mode
     const [flyMode, setFlyMode] = useState(false)
+    const stepBuffers = useRef<AudioBuffer[]>([])
 
     // Initialize player on server (Nickname only)
     useEffect(() => {
@@ -66,6 +68,24 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             setAudioListener(null)
         }
     }, [camera, setAudioListener])
+
+    // Preload positional footstep buffers once listener is ready
+    useEffect(() => {
+        const listener = useVoiceStore.getState().audioListener
+        if (!listener) return
+        const loader = new AudioLoader()
+        const buffers: AudioBuffer[] = []
+        let mounted = true
+        const files = ['/sounds/steps/1.mp3', '/sounds/steps/2.mp3', '/sounds/steps/3.mp3']
+        files.forEach((file) => {
+            loader.load(file, (buffer) => {
+                if (!mounted) return
+                buffers.push(buffer)
+                stepBuffers.current = buffers
+            })
+        })
+        return () => { mounted = false }
+    }, [])
 
     // Toggle View & Debug Fly Mode
     useEffect(() => {
@@ -228,9 +248,29 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
         setIsMoving(moving)
         setIsRunning(run)
 
-        // Head Bobbing (Only in First Person AND NOT Flying)
-        if (cameraMode === 'FIRST') {
-            if (moving && !flyMode) {
+        // Head Bobbing + footstep timing (only when not flying)
+        const playFootstep = () => {
+            const listener = useVoiceStore.getState().audioListener
+            const sfxVolume = useGameStore.getState().volumes.sfx
+            if (!listener || stepBuffers.current.length === 0) return
+            const buffer = stepBuffers.current[Math.floor(Math.random() * stepBuffers.current.length)]
+            const sound = new ThreePositionalAudio(listener)
+            sound.setBuffer(buffer)
+            sound.setRefDistance(1)
+            sound.setMaxDistance(12)
+            sound.setRolloffFactor(1)
+            sound.setVolume(0.35 * sfxVolume)
+            sound.position.set(translation.x, translation.y, translation.z)
+            scene.add(sound)
+            sound.play()
+            sound.source?.addEventListener('ended', () => {
+                scene.remove(sound)
+                sound.disconnect()
+            })
+        }
+
+        if (!flyMode) {
+            if (moving) {
                 const previousBob = bobState.current
                 bobState.current += delta * (run ? 15 : 10)
 
@@ -241,19 +281,17 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
 
                 // Trigger at bottom (3PI/2)
                 if (prevPhase < 4.71 && currentPhase >= 4.71) {
-                    const randomIdx = Math.floor(Math.random() * 3) + 1
-                    const audio = new Audio(`/sounds/steps/${randomIdx}.mp3`)
-                    // Use SFX volume from store
-                    const sfxVolume = useGameStore.getState().volumes.sfx
-                    audio.volume = 0.3 * sfxVolume // Not too loud
-                    audio.play().catch(() => { }) // Ignore autoplay errors
+                    playFootstep()
                 }
 
             } else {
                 bobState.current = 0
             }
-            const bobOffset = (moving && !flyMode) ? Math.sin(bobState.current) * 0.1 : 0
+        }
 
+        const bobOffset = (!flyMode && cameraMode === 'FIRST' && moving) ? Math.sin(bobState.current) * 0.1 : 0
+
+        if (cameraMode === 'FIRST') {
             // First person: Camera matches player position
             camera.position.set(translation.x, translation.y + 1 + bobOffset, translation.z)
         } else {

@@ -24,6 +24,9 @@ export function Zombie({ spawnPoint }: ZombieProps) {
     const { actions } = useAnimations(animations, modelRef)
     const { rapier, world } = useRapier()
     const [currentState, setCurrentState] = useState<ZombieState>('idle')
+    const attackStartRef = useRef<number | null>(null)
+    const attackDurationRef = useRef<number>(1)
+    const attackAppliedRef = useRef<boolean>(false)
 
     // Helper to find actions by partial name (case insensitive)
     const findAction = (name: string) => {
@@ -45,9 +48,22 @@ export function Zombie({ spawnPoint }: ZombieProps) {
             if (act) act.fadeOut(0.15)
         })
 
-        if (next === 'idle') fade(idle)
-        if (next === 'run') fade(run || idle)
-        if (next === 'attack') fade(attack || run || idle)
+        if (next === 'idle') {
+            attackStartRef.current = null
+            attackAppliedRef.current = false
+            fade(idle)
+        }
+        if (next === 'run') {
+            attackStartRef.current = null
+            attackAppliedRef.current = false
+            fade(run || idle)
+        }
+        if (next === 'attack') {
+            attackStartRef.current = performance.now()
+            attackAppliedRef.current = false
+            attackDurationRef.current = attack?.getClip()?.duration || 1
+            fade(attack || run || idle)
+        }
         setCurrentState(next)
     }
 
@@ -98,15 +114,33 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         const dir = target.clone().sub(new THREE.Vector3(pos.x, pos.y, pos.z))
         const flatLen = Math.hypot(dir.x, dir.z)
 
-        // Trigger damage only when actually in range
+        // Trigger attack when in range (death is applied mid-animation)
         if (flatLen < ATTACK_RANGE) {
-            playState('attack')
-            body.setLinvel({ x: 0, y: body.linvel().y, z: 0 }, true)
-            if (nearestTarget.id === localId && !useGameStore.getState().isPlayerDead) {
-                setPlayerDead(true)
-                if (document.pointerLockElement) document.exitPointerLock()
+            if (currentState !== 'attack') {
+                playState('attack')
             }
-            return
+            body.setLinvel({ x: 0, y: body.linvel().y, z: 0 }, true)
+        } else {
+            // Reset attack progress if we leave range
+            attackStartRef.current = null
+            attackAppliedRef.current = false
+        }
+
+        // Apply damage halfway through the attack animation if still in range
+        if (
+            currentState === 'attack' &&
+            attackStartRef.current !== null &&
+            !attackAppliedRef.current
+        ) {
+            const elapsed = (performance.now() - attackStartRef.current) / 1000
+            const triggerTime = attackDurationRef.current * 0.5
+            if (elapsed >= triggerTime && flatLen < ATTACK_RANGE) {
+                attackAppliedRef.current = true
+                if (nearestTarget.id === localId && !useGameStore.getState().isPlayerDead) {
+                    setPlayerDead(true)
+                    if (document.pointerLockElement) document.exitPointerLock()
+                }
+            }
         }
 
         // Normalized forward direction

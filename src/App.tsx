@@ -133,6 +133,14 @@ export default function App() {
         }
     }, [phase, isSettingsOpen, isPauseMenuOpen, isPlayerListOpen])
 
+    const handleResume = () => {
+        setIsPauseMenuOpen(false)
+        if (phase === 'PLAYING' && !document.pointerLockElement) {
+            // Request pointer lock to go back "in game"
+            (document.body as HTMLElement).requestPointerLock?.()
+        }
+    }
+
     const handleQuit = () => {
         setIsPauseMenuOpen(false)
         setIsSettingsOpen(false)
@@ -190,7 +198,7 @@ export default function App() {
                     {/* Pause Menu */}
                     {isPauseMenuOpen && !isSettingsOpen && (
                         <PauseMenu
-                            onResume={() => setIsPauseMenuOpen(false)}
+                            onResume={handleResume}
                             onOpenSettings={() => setIsSettingsOpen(true)}
                             onQuit={handleQuit}
                         />
