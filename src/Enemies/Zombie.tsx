@@ -27,6 +27,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
     const attackStartRef = useRef<number | null>(null)
     const attackDurationRef = useRef<number>(1)
     const attackAppliedRef = useRef<boolean>(false)
+    const attackLockUntilRef = useRef<number>(0) // timestamp in ms
 
     // Helper to find actions by partial name (case insensitive)
     const findAction = (name: string) => {
@@ -59,9 +60,14 @@ export function Zombie({ spawnPoint }: ZombieProps) {
             fade(run || idle)
         }
         if (next === 'attack') {
+            const now = performance.now()
+            const clipDuration = attack?.getClip()?.duration || 1
+            if (now < attackLockUntilRef.current) return // prevent spam/restart while attack is active
+            attackLockUntilRef.current = now + clipDuration * 1000
+
             attackStartRef.current = performance.now()
             attackAppliedRef.current = false
-            attackDurationRef.current = attack?.getClip()?.duration || 1
+            attackDurationRef.current = clipDuration
             fade(attack || run || idle)
         }
         setCurrentState(next)
