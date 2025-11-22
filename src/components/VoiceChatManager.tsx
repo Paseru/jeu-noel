@@ -18,6 +18,8 @@ export default function VoiceChatManager() {
 
     // Initialize Audio and Local Stream
     useEffect(() => {
+        let cancelled = false
+
         const initAudio = async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
@@ -28,6 +30,8 @@ export default function VoiceChatManager() {
                     },
                     video: false
                 })
+                if (cancelled) return
+
                 localStreamRef.current = stream
                 setLocalStream(stream)
 
@@ -51,8 +55,11 @@ export default function VoiceChatManager() {
         initAudio()
 
         return () => {
+            cancelled = true
             localStreamRef.current?.getTracks().forEach(track => track.stop())
             audioContextRef.current?.close()
+            localStreamRef.current = null
+            setLocalStream(null)
         }
     }, [setLocalStream])
 
@@ -85,7 +92,7 @@ export default function VoiceChatManager() {
 
     // Socket Events for WebRTC - Stable Listeners
     useEffect(() => {
-        if (!socket || !playerId || !localStream) return
+        if (!socket || !playerId) return
 
         // Handle incoming signals
         const handleSignal = ({ sender, signal }: { sender: string, signal: any }) => {
@@ -95,7 +102,7 @@ export default function VoiceChatManager() {
                 peer.signal(signal)
             } else {
                 console.log(`[VoiceChat] New incoming connection from ${sender}`)
-                const newPeer = createPeer(sender, socket, localStream!, false)
+                const newPeer = createPeer(sender, socket, false)
                 peersRef.current[sender] = newPeer
                 newPeer.signal(signal)
             }
@@ -106,7 +113,7 @@ export default function VoiceChatManager() {
             if (player.id === playerId) return
             if (!peersRef.current[player.id] && playerId > player.id) {
                 console.log(`[VoiceChat] Initiating connection to ${player.id}`)
-                const peer = createPeer(player.id, socket, localStream!, true)
+                const peer = createPeer(player.id, socket, true)
                 peersRef.current[player.id] = peer
             }
         }
@@ -130,17 +137,17 @@ export default function VoiceChatManager() {
             socket.off('newPlayer', handleNewPlayer)
             socket.off('playerDisconnected', handlePlayerDisconnected)
         }
-    }, [socket, playerId, removeRemoteStream, localStream]) // Added localStream dependency
+    }, [socket, playerId, removeRemoteStream])
 
     // Connection Maintenance - Dynamic (Checks for missing connections)
     useEffect(() => {
-        if (!socket || !playerId || !localStreamRef.current) return
+        if (!socket || !playerId) return
 
         Object.keys(players).forEach((id) => {
             if (id !== playerId && !peersRef.current[id]) {
                 if (playerId > id) {
                     console.log(`[VoiceChat] Maintenance: Initiating connection to ${id}`)
-                    const peer = createPeer(id, socket, localStreamRef.current!, true)
+                    const peer = createPeer(id, socket, true)
                     peersRef.current[id] = peer
                 }
             }
@@ -161,8 +168,37 @@ export default function VoiceChatManager() {
         })
     }, [mutedPlayers, remoteStreams])
 
-    function createPeer(targetId: string, socket: any, stream: MediaStream, initiator: boolean) {
+    // Ensure all peers carry the current microphone tracks (added even if peers were created before mic was ready)
+    useEffect(() => {
+        if (!localStreamRef.current) return
+
+        const stream = localStreamRef.current
+        const audioTracks = stream.getAudioTracks()
+        if (audioTracks.length === 0) return
+
+        Object.values(peersRef.current).forEach((peer) => {
+            // Avoid adding duplicates
+            const senders = (peer as any)?._pc?.getSenders?.() || []
+            audioTracks.forEach((track) => {
+                const alreadySending = senders.some((sender: RTCRtpSender) => sender.track === track)
+                if (!alreadySending) {
+                    peer.addTrack(track, stream)
+                }
+            })
+        })
+    }, [localStream])
+
+    // Destroy all peers on unmount to avoid zombie connections when rejoining
+    useEffect(() => {
+        return () => {
+            Object.values(peersRef.current).forEach(peer => peer.destroy())
+            peersRef.current = {}
+        }
+    }, [])
+
+    function createPeer(targetId: string, socket: any, initiator: boolean) {
         console.log(`[VoiceChat] Creating peer for ${targetId} (Initiator: ${initiator})`)
+        const stream = localStreamRef.current || undefined
         const peer = new SimplePeer({
             initiator,
             trickle: false,

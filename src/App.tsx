@@ -11,11 +11,11 @@ import VoiceChatManager from './components/VoiceChatManager'
 import { useGameStore } from './stores/useGameStore'
 import { useVoiceStore } from './stores/useVoiceStore'
 import MobileControls from './UI/MobileControls'
-import { ZombieSpawnButton } from './components/ZombieSpawnButton'
 import { InteractionPrompt } from './UI/InteractionPrompt'
 import PlayerList from './UI/PlayerList'
 import { DeathScreen } from './UI/DeathScreen'
 import Loader from './UI/Loader'
+import SummonHud from './UI/SummonHud'
 
 export default function App() {
     const map = useMemo(() => [
@@ -31,7 +31,8 @@ export default function App() {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
     const [isPauseMenuOpen, setIsPauseMenuOpen] = useState(false)
     const [isPlayerListOpen, setIsPlayerListOpen] = useState(false)
-    const audioRef = useRef<HTMLAudioElement>(null)
+    const menuAudioRef = useRef<HTMLAudioElement>(null)
+    const gameAudioRef = useRef<HTMLAudioElement>(null)
 
     const { phase, volumes, mapLoaded } = useGameStore()
     useEffect(() => {
@@ -43,14 +44,31 @@ export default function App() {
     }, [])
 
     useEffect(() => {
-        if (audioRef.current) {
-            audioRef.current.volume = volumes.music
-            // Try to play automatically (might be blocked by browser policy until interaction)
-            audioRef.current.play().catch(() => {
-                console.log("Audio autoplay blocked, waiting for interaction")
+        if (menuAudioRef.current) menuAudioRef.current.volume = volumes.music
+        if (gameAudioRef.current) gameAudioRef.current.volume = volumes.music
+    }, [volumes.music])
+
+    useEffect(() => {
+        const menuAudio = menuAudioRef.current
+        const gameAudio = gameAudioRef.current
+
+        if (!menuAudio || !gameAudio) return
+
+        if (phase === 'MENU') {
+            gameAudio.pause()
+            gameAudio.currentTime = 0
+            menuAudio.volume = volumes.music
+            menuAudio.play().catch(() => {
+                console.log('Menu music autoplay blocked, waiting for interaction')
+            })
+        } else if (phase === 'PLAYING') {
+            menuAudio.pause()
+            gameAudio.volume = volumes.music
+            gameAudio.play().catch(() => {
+                console.log('In-game music autoplay blocked, waiting for interaction')
             })
         }
-    }, [volumes.music])
+    }, [phase, volumes.music])
 
     // Play on first interaction if autoplay was blocked
     const audioListener = useVoiceStore((state) => state.audioListener)
@@ -58,8 +76,9 @@ export default function App() {
     // Play on first interaction if autoplay was blocked
     useEffect(() => {
         const handleInteraction = () => {
-            if (audioRef.current && audioRef.current.paused) {
-                audioRef.current.play()
+            const targetAudio = phase === 'PLAYING' ? gameAudioRef.current : menuAudioRef.current
+            if (targetAudio && targetAudio.paused) {
+                targetAudio.play()
             }
             if (audioListener && audioListener.context.state === 'suspended') {
                 audioListener.context.resume()
@@ -71,7 +90,7 @@ export default function App() {
             window.removeEventListener('click', handleInteraction)
             window.removeEventListener('keydown', handleInteraction)
         }
-    }, [audioListener])
+    }, [audioListener, phase])
 
     // Handle Escape key & Tab Key
     useEffect(() => {
@@ -161,9 +180,16 @@ export default function App() {
         <KeyboardControls map={map}>
             {/* Background Music */}
             <audio
-                ref={audioRef}
+                ref={menuAudioRef}
+                src="/sounds/(Free) Horror Ambiance - Ominous Background Music.mp3"
+                loop
+                preload="auto"
+            />
+            <audio
+                ref={gameAudioRef}
                 src="/sounds/John Carpenter Halloween Theme [Movie Version Extended by Gilles Nuytens].mp3"
                 loop
+                preload="auto"
             />
 
             <Canvas
@@ -194,11 +220,10 @@ export default function App() {
                     <Chat />
                     <VoiceChatManager />
                     <VoiceIndicator />
+                    <SummonHud />
                     {!isSettingsOpen && !isPauseMenuOpen && !isPlayerListOpen && (
                         <MobileControls onOpenMenu={() => setIsPauseMenuOpen(true)} />
                     )}
-
-                    <ZombieSpawnButton />
 
                     <InteractionPrompt />
 

@@ -7,6 +7,7 @@ import { Map } from './World/Map'
 import { Snow } from './World/Snow'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ZombieManager } from './Enemies/ZombieManager'
+import { ZombieSummonZone } from './Enemies/ZombieSummonZone'
 
 import { useGameStore } from './stores/useGameStore'
 import RemotePlayer from './Multiplayer/RemotePlayer'
@@ -35,6 +36,8 @@ export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
                 }>
                     <Map />
                 </ErrorBoundary>
+
+                <ZombieSummonZone />
 
                 <PlayerController isSettingsOpen={isSettingsOpen} />
 

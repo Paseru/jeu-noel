@@ -16,7 +16,8 @@ const ROOMS = [
         mapImage: "/maps/Snowy Village.jpg",
         modelPath: "/models/snowy_village_ps1_environment.glb",
         maxPlayers: 40,
-        spawnPoint: [1.98, 9.55, -11.47]
+        spawnPoint: [1.98, 9.55, -11.47],
+        zombieSpawnPoint: [47.74, 13.03, -140.37]
     },
     {
         id: "server-tacos",
@@ -24,7 +25,8 @@ const ROOMS = [
         mapImage: "/maps/Tacos.jpg",
         modelPath: "/models/tacos (1).glb",
         maxPlayers: 40,
-        spawnPoint: [-0.13, 2.06, 16.38]
+        spawnPoint: [-0.13, 2.06, 16.38],
+        zombieSpawnPoint: [-73.19, 4.78, -17.39]
     }
 ];
 
@@ -191,7 +193,7 @@ io.on("connection", (socket) => {
         }
         lastSpawnBySocket[socket.id] = now;
         const room = ROOMS.find(r => r.id === player.roomId);
-        const spawnPoint = room?.spawnPoint || [0, 2, 0];
+        const spawnPoint = room?.zombieSpawnPoint || room?.spawnPoint || [0, 2, 0];
         const zombie = {
             id: `z-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
             spawnPoint

@@ -37,7 +37,24 @@ interface Room {
     playerCount: number
     scale?: number
     spawnPoint?: [number, number, number]
+    zombieSpawnPoint?: [number, number, number]
 }
+
+interface GatherState {
+    status: 'idle' | 'countdown'
+    countdownMs: number | null
+    inside: number
+    alive: number
+    total: number
+}
+
+const createInitialGatherState = (): GatherState => ({
+    status: 'idle',
+    countdownMs: null,
+    inside: 0,
+    alive: 0,
+    total: 0
+})
 
 interface Zombie {
     id: string
@@ -65,6 +82,7 @@ interface GameState {
     messages: ChatMessage[]
     rooms: Room[]
     currentRoomId: string | null
+    roundActive: boolean
 
     playerId: string | null
     nickname: string
@@ -124,6 +142,12 @@ interface GameState {
     // Interaction System
     interactionText: string | null
     setInteractionText: (text: string | null) => void
+
+    // Gather / Summon Zone state for UI
+    gather: GatherState
+    setGatherState: (state: Partial<GatherState>) => void
+    resetGatherState: () => void
+    setRoundActive: (active: boolean) => void
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -180,6 +204,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     messages: [],
     rooms: [],
     currentRoomId: null,
+    roundActive: false,
     playerId: null,
     nickname: '',
     isChatOpen: false,
@@ -322,15 +347,15 @@ export const useGameStore = create<GameState>((set, get) => ({
         })
 
         socket.on('currentZombies', (zombies: Zombie[]) => {
-            set({ zombies })
+            set({ zombies, roundActive: zombies.length > 0 })
         })
 
         socket.on('zombieSpawned', (zombie: Zombie) => {
-            set((state) => ({ zombies: [...state.zombies, zombie] }))
+            set((state) => ({ zombies: [...state.zombies, zombie], roundActive: true }))
         })
 
         socket.on('zombiesCleared', () => {
-            set({ zombies: [] })
+            set({ zombies: [], roundActive: false, gather: createInitialGatherState() })
         })
 
         socket.on('playerSpeaking', ({ id, isSpeaking }) => {
@@ -376,7 +401,15 @@ export const useGameStore = create<GameState>((set, get) => ({
         const socket = get().socket
         if (socket) {
             socket.emit('joinRoom', { roomId, nickname: get().nickname })
-            set({ phase: 'PLAYING', currentRoomId: roomId, isPlayerDead: false, mapLoaded: false, zombies: [] })
+            set({
+                phase: 'PLAYING',
+                currentRoomId: roomId,
+                isPlayerDead: false,
+                mapLoaded: false,
+                zombies: [],
+                roundActive: false,
+                gather: createInitialGatherState()
+            })
         }
     },
 
@@ -394,7 +427,13 @@ export const useGameStore = create<GameState>((set, get) => ({
             isPlayerDead: false,
             mapLoaded: false,
             socket: null,
-            playerId: null
+            playerId: null,
+            roundActive: false,
+            gather: createInitialGatherState(),
+            movementLocked: false,
+            movementLockSources: [],
+            cameraForceSources: [],
+            forcedCameraMode: null
         })
     },
 
@@ -437,9 +476,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         return { players: rest }
     }),
     setPlayers: (players) => set({ players }),
-    setZombies: (zombies) => set({ zombies }),
-    addZombie: (zombie) => set((state) => ({ zombies: [...state.zombies, zombie] })),
-    clearZombies: () => set({ zombies: [] }),
+    setZombies: (zombies) => set({ zombies, roundActive: zombies.length > 0 }),
+    addZombie: (zombie) => set((state) => ({ zombies: [...state.zombies, zombie], roundActive: true })),
+    clearZombies: () => set({ zombies: [], roundActive: false, gather: createInitialGatherState() }),
 
     setLocalPlayerTransform: (position, quaternion, isMoving, isRunning) => set((state) => {
         const { playerId, nickname, myCharacterIndex, phase, currentRoomId } = state
@@ -465,5 +504,28 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     // Interaction System
     interactionText: null,
-    setInteractionText: (text) => set({ interactionText: text })
+    setInteractionText: (text) => set({ interactionText: text }),
+
+    // Gather / Summon state (shared with UI)
+    gather: {
+        ...createInitialGatherState()
+    },
+    setGatherState: (state) => set((current) => {
+        const next = { ...current.gather, ...state }
+        if (
+            next.status === current.gather.status &&
+            next.countdownMs === current.gather.countdownMs &&
+            next.inside === current.gather.inside &&
+            next.alive === current.gather.alive &&
+            next.total === current.gather.total
+        ) {
+            return current
+        }
+        return { gather: next }
+    }),
+    resetGatherState: () => set({
+        gather: createInitialGatherState()
+    }),
+
+    setRoundActive: (active) => set({ roundActive: active })
 }))
