@@ -164,8 +164,8 @@ export function Zombie({ spawnPoint }: ZombieProps) {
             position={spawnPoint}
             enabledRotations={[false, false, false]}
         >
-            <CapsuleCollider args={[0.8, 0.32]} />
-            <group ref={modelRef} position={[0, -1.05, 0]} scale={0.92}>
+            <CapsuleCollider args={[0.5, 0.25]} />
+            <group ref={modelRef} position={[0, -0.55, 0]} scale={0.5}>
                 <primitive object={cloneScene} />
             </group>
         </RigidBody>
