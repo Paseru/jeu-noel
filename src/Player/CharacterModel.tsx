@@ -91,31 +91,45 @@ export default function CharacterModel({
 
         if (!animations.length || !Object.keys(actions).length) return
 
-        // Robust fallback logic
         const runAction = findAction('run') || actions[Object.keys(actions)[2]] // Fallback to 3rd anim
         const walkAction = findAction('walk') || actions[Object.keys(actions)[1]] // Fallback to 2nd anim
         const idleAction = findAction('idle') || actions[Object.keys(actions)[0]] // Fallback to 1st anim
 
-        // Stop all first to avoid stuck mixers when rejoining a match
-        Object.values(actions).forEach(a => a?.stop())
+        const playExclusive = (action?: THREE.AnimationAction | null) => {
+            if (!action) return
+            Object.values(actions).forEach(a => {
+                if (a && a !== action) a.stop()
+            })
+            action.reset().fadeIn(0.15).play()
+        }
 
         if (isMoving) {
             if (isRunning && runAction) {
-                runAction.reset().fadeIn(0.2).play()
+                playExclusive(runAction)
             } else if (walkAction) {
-                walkAction.reset().fadeIn(0.2).play()
+                playExclusive(walkAction)
             } else if (runAction) {
-                // Fallback to run if walk missing
-                runAction.reset().fadeIn(0.2).play()
+                playExclusive(runAction)
             }
-        } else if (idleAction) {
-            idleAction.reset().fadeIn(0.2).play()
+        } else {
+            playExclusive(idleAction)
         }
 
         return () => {
-            // Leave actions running; they are stopped on next update or unmount
+            // Keep current action; next effect run will replace if needed
         }
     }, [isMoving, isRunning, actions, animations, characterIndex, phase])
+
+    // Safety: if mixer is idle (e.g., after respawn), kick idle once
+    useEffect(() => {
+        if (!animations.length || !Object.keys(actions).length) return
+        const idleAction = actions[animations[0]?.name] || actions[Object.keys(actions)[0]]
+        const anyRunning = Object.values(actions).some(a => a?.isRunning && a.isRunning())
+        if (!anyRunning && idleAction) {
+            Object.values(actions).forEach(a => a?.stop())
+            idleAction.reset().fadeIn(0.15).play()
+        }
+    }, [animations, actions, phase])
 
     // Nameplate Visibility Logic
     const [isNameplateVisible, setIsNameplateVisible] = useState(true)

@@ -18,7 +18,7 @@ const ROOMS = [
         maxPlayers: 40,
         spawnPoint: [1.98, 9.55, -11.47],
         zombieSpawnPoint: [47.74, 13.03, -140.37],
-        summonPoint: [-4.67, 0.80, -20.92]
+        summonPoint: [-4.13, 0.80, -25.91]
     },
     {
         id: "server-tacos",
@@ -27,7 +27,8 @@ const ROOMS = [
         modelPath: "/models/tacos (1).glb",
         maxPlayers: 40,
         spawnPoint: [-0.13, 2.06, 16.38],
-        zombieSpawnPoint: [-73.19, 4.78, -17.39]
+        zombieSpawnPoint: [-73.19, 4.78, -17.39],
+        summonPoint: [12.30, 0.66, 9.29]
     }
 ];
 
