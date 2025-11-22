@@ -34,6 +34,13 @@ export default function App() {
     const audioRef = useRef<HTMLAudioElement>(null)
 
     const { phase, volumes, mapLoaded } = useGameStore()
+    useEffect(() => {
+        const handleBeforeUnload = () => {
+            useGameStore.getState().leaveRoom()
+        }
+        window.addEventListener('beforeunload', handleBeforeUnload)
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+    }, [])
 
     useEffect(() => {
         if (audioRef.current) {
@@ -146,9 +153,8 @@ export default function App() {
         setIsPauseMenuOpen(false)
         setIsSettingsOpen(false)
         setIsPlayerListOpen(false)
-        // Disconnect/Leave room logic could go here if needed
-        // For now just switch phase to MENU
-        useGameStore.setState({ phase: 'MENU', currentRoomId: null, isPlayerDead: false })
+        // Leave current room to avoid ghost players
+        useGameStore.getState().leaveRoom()
     }
 
     return (

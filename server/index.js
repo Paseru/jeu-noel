@@ -28,11 +28,30 @@ const ROOMS = [
     }
 ];
 
-let players = {}; // { socketId: { ...playerData, roomId } }
+let players = {}; // { socketId: { ...playerData, roomId, lastSeen } }
+let roomZombies = {}; // { roomId: [{ id, spawnPoint }] }
 let nextCharacterIndex = 1;
+
+const STALE_PLAYER_MS = 15000; // remove players that haven't heartbeat'ed for 15s
 
 io.on("connection", (socket) => {
     console.log("New connection:", socket.id);
+
+    const touchPlayer = () => {
+        if (players[socket.id]) {
+            players[socket.id].lastSeen = Date.now();
+        }
+    };
+
+    const removePlayer = () => {
+        const player = players[socket.id];
+        if (player) {
+            console.log("Player disconnected/removed:", socket.id);
+            const roomId = player.roomId;
+            delete players[socket.id];
+            io.to(roomId).emit("playerDisconnected", socket.id);
+        }
+    };
 
     // Send available rooms and their current player counts
     socket.on("getRooms", () => {
@@ -71,7 +90,8 @@ io.on("connection", (socket) => {
             isRunning: false,
             characterIndex: assignedCharacterIndex,
             isSpeaking: false,
-            nickname: nickname || "Player"
+            nickname: nickname || "Player",
+            lastSeen: Date.now()
         };
 
         // Get all players in THIS room
@@ -85,16 +105,30 @@ io.on("connection", (socket) => {
         // Send current players in this room to the new player
         socket.emit("currentPlayers", roomPlayers);
 
+        // Send existing zombies in this room
+        const zombies = roomZombies[roomId] || [];
+        socket.emit("currentZombies", zombies);
+
         // Broadcast new player to everyone else in the room
         socket.to(roomId).emit("newPlayer", players[socket.id]);
 
         console.log(`Player ${socket.id} joined room ${roomId} as ${players[socket.id].nickname}`);
     });
 
+    // Player explicitly leaves the room (e.g., back to menu)
+    socket.on("leaveRoom", () => {
+        removePlayer();
+        socket.leaveAll();
+    });
+
+    // Heartbeat to keep player alive even when standing still
+    socket.on("heartbeat", () => touchPlayer());
+
     // Handle player movement
     socket.on("playerMove", (data) => {
         const player = players[socket.id];
         if (player) {
+            touchPlayer();
             player.position = data.position;
             player.quaternion = data.quaternion;
             player.isMoving = data.isMoving;
@@ -110,6 +144,21 @@ io.on("connection", (socket) => {
                 isSpeaking: player.isSpeaking
             });
         }
+    });
+
+    // Spawn zombie for the player's current room
+    socket.on("spawnZombie", () => {
+        const player = players[socket.id];
+        if (!player) return;
+        const room = ROOMS.find(r => r.id === player.roomId);
+        const spawnPoint = room?.spawnPoint || [0, 2, 0];
+        const zombie = {
+            id: `z-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            spawnPoint
+        };
+        if (!roomZombies[player.roomId]) roomZombies[player.roomId] = [];
+        roomZombies[player.roomId].push(zombie);
+        io.to(player.roomId).emit("zombieSpawned", zombie);
     });
 
     // Handle WebRTC Signaling
@@ -156,14 +205,21 @@ io.on("connection", (socket) => {
 
     // Handle disconnect
     socket.on("disconnect", () => {
-        const player = players[socket.id];
-        if (player) {
-            console.log("Player disconnected:", socket.id);
-            const roomId = player.roomId;
-            delete players[socket.id];
-            io.to(roomId).emit("playerDisconnected", socket.id);
-        }
+        removePlayer();
     });
 });
+
+// Periodically purge stale connections that never sent a disconnect
+setInterval(() => {
+    const now = Date.now();
+    Object.entries(players).forEach(([id, player]) => {
+        if (now - player.lastSeen > STALE_PLAYER_MS) {
+            console.log(`Pruning stale player ${id}`);
+            const roomId = player.roomId;
+            delete players[id];
+            io.to(roomId).emit("playerDisconnected", id);
+        }
+    });
+}, 5000);
 
 console.log(`Server running on port ${PORT}`);

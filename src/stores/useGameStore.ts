@@ -38,11 +38,17 @@ interface Room {
     spawnPoint?: [number, number, number]
 }
 
+interface Zombie {
+    id: string
+    spawnPoint: [number, number, number]
+}
+
 interface GameState {
     phase: 'MENU' | 'PLAYING'
     setPhase: (phase: 'MENU' | 'PLAYING') => void
     socket: Socket | null
     players: Record<string, PlayerState>
+    zombies: Zombie[]
     isPlayerDead: boolean
     setPlayerDead: (dead: boolean) => void
     mapLoaded: boolean
@@ -85,11 +91,16 @@ interface GameState {
     connectSocket: () => void
     fetchRooms: () => void
     joinRoom: (roomId: string) => void
+    leaveRoom: () => void
+    spawnZombie: () => void
 
     updatePlayer: (id: string, position: [number, number, number], quaternion: [number, number, number, number]) => void
     addPlayer: (player: PlayerState) => void
     removePlayer: (id: string) => void
     setPlayers: (players: Record<string, PlayerState>) => void
+    setZombies: (zombies: Zombie[]) => void
+    addZombie: (zombie: Zombie) => void
+    clearZombies: () => void
     sendMessage: (text: string) => void
     addChatMessage: (message: ChatMessage) => void
 
@@ -111,6 +122,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     setPhase: (phase) => set({ phase }),
     socket: null,
     players: {},
+    zombies: [],
     isPlayerDead: false,
     setPlayerDead: (dead) => set({ isPlayerDead: dead }),
     mapLoaded: false,
@@ -188,10 +200,14 @@ export const useGameStore = create<GameState>((set, get) => ({
 
         const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'
         const socket = io(serverUrl)
+        let heartbeatInterval: number | null = null
 
         socket.on('connect', () => {
             console.log('Connected to server:', serverUrl)
             set({ playerId: socket.id })
+            heartbeatInterval = window.setInterval(() => {
+                socket.emit('heartbeat')
+            }, 5000)
         })
 
         socket.on('roomList', (rooms) => {
@@ -255,6 +271,14 @@ export const useGameStore = create<GameState>((set, get) => ({
             }))
         })
 
+        socket.on('currentZombies', (zombies: Zombie[]) => {
+            set({ zombies })
+        })
+
+        socket.on('zombieSpawned', (zombie: Zombie) => {
+            set((state) => ({ zombies: [...state.zombies, zombie] }))
+        })
+
         socket.on('playerSpeaking', ({ id, isSpeaking }) => {
             set((state) => {
                 if (!state.players[id]) return state
@@ -268,6 +292,13 @@ export const useGameStore = create<GameState>((set, get) => ({
                     }
                 }
             })
+        })
+
+        socket.on('disconnect', () => {
+            if (heartbeatInterval) {
+                clearInterval(heartbeatInterval)
+                heartbeatInterval = null
+            }
         })
 
         set({ socket })
@@ -291,7 +322,30 @@ export const useGameStore = create<GameState>((set, get) => ({
         const socket = get().socket
         if (socket) {
             socket.emit('joinRoom', { roomId, nickname: get().nickname })
-            set({ phase: 'PLAYING', currentRoomId: roomId, isPlayerDead: false, mapLoaded: false })
+            set({ phase: 'PLAYING', currentRoomId: roomId, isPlayerDead: false, mapLoaded: false, zombies: [] })
+        }
+    },
+
+    leaveRoom: () => {
+        const socket = get().socket
+        if (socket) {
+            socket.emit('leaveRoom')
+        }
+        set({
+            phase: 'MENU',
+            currentRoomId: null,
+            players: {},
+            zombies: [],
+            isPlayerDead: false,
+            mapLoaded: false
+        })
+    },
+
+    spawnZombie: () => {
+        const socket = get().socket
+        const roomId = get().currentRoomId
+        if (socket && roomId) {
+            socket.emit('spawnZombie')
         }
     },
 
@@ -316,10 +370,13 @@ export const useGameStore = create<GameState>((set, get) => ({
         return { players: rest }
     }),
     setPlayers: (players) => set({ players }),
+    setZombies: (zombies) => set({ zombies }),
+    addZombie: (zombie) => set((state) => ({ zombies: [...state.zombies, zombie] })),
+    clearZombies: () => set({ zombies: [] }),
 
     setLocalPlayerTransform: (position, quaternion, isMoving, isRunning) => set((state) => {
-        const { playerId, nickname, myCharacterIndex } = state
-        if (!playerId) return state
+        const { playerId, nickname, myCharacterIndex, phase, currentRoomId } = state
+        if (!playerId || phase !== 'PLAYING' || !currentRoomId) return state
         const existing = state.players[playerId]
         return {
             players: {

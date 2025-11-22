@@ -2,42 +2,46 @@ import { useEffect } from 'react'
 import { useGameStore } from '../stores/useGameStore'
 
 export const DeathScreen = () => {
-    const { setPhase, setPlayerDead, isPlayerDead } = useGameStore()
+    const { setPhase, setPlayerDead, isPlayerDead, setMapLoaded } = useGameStore()
 
-    if (!isPlayerDead) return null
-
-    // Ensure cursor is free while dead
+    // Keep pointer unlocked and cursor visible once dead
     useEffect(() => {
+        if (!isPlayerDead) return
         if (document.pointerLockElement) {
             document.exitPointerLock()
         }
-    }, [])
+    }, [isPlayerDead])
+
+    if (!isPlayerDead) return null
 
     const handleBackToMenu = () => {
         setPlayerDead(false)
         setPhase('MENU')
-        // Optionally clear room selection
+        setMapLoaded(false)
         useGameStore.setState({ currentRoomId: null })
     }
 
     return (
-        <div className="absolute inset-0 z-[1200] flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm">
-            <div className="text-center mb-10 animate-in fade-in duration-300">
-                <h1 className="text-8xl landscape:text-6xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60 drop-shadow-2xl uppercase">
-                    You Are Dead
-                </h1>
-                <p className="text-white/60 text-xl landscape:text-lg font-mono tracking-[0.5em] mt-4 uppercase">
-                    Back to safety
+        <div className="fixed inset-0 z-[12000] flex items-center justify-center bg-gradient-to-br from-black via-[#170202] to-black text-white">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,0,0,0.12),transparent_60%)] pointer-events-none" />
+            <div className="relative z-10 text-center space-y-6 px-6">
+                <p className="text-sm font-mono tracking-[0.4em] text-white/70">
+                    YOU ARE DEAD
                 </p>
+                <h1 className="text-6xl md:text-7xl font-black tracking-tight text-red-500 drop-shadow-[0_0_25px_rgba(248,113,113,0.6)]">
+                    GAME OVER
+                </h1>
+                <p className="text-white/60 font-mono text-sm">
+                    Le zombie t&apos;a eu. Retourne au menu pour relancer une partie.
+                </p>
+                <button
+                    onClick={handleBackToMenu}
+                    className="group relative inline-flex items-center justify-center px-8 py-3 bg-white text-black font-bold text-lg rounded-full hover:scale-105 transition-all duration-200 shadow-[0_0_35px_rgba(255,255,255,0.25)]"
+                >
+                    <span className="relative z-10">Retour au menu</span>
+                    <div className="absolute inset-0 rounded-full bg-white blur-md opacity-50 group-hover:opacity-80 transition-opacity" />
+                </button>
             </div>
-
-            <button
-                onClick={handleBackToMenu}
-                className="group relative px-8 py-4 bg-white text-black font-bold text-xl rounded-full hover:scale-105 transition-all duration-300 shadow-[0_0_40px_rgba(255,255,255,0.35)] hover:shadow-[0_0_60px_rgba(255,255,255,0.5)]"
-            >
-                <span className="relative z-10">Back to Menu</span>
-                <div className="absolute inset-0 rounded-full bg-white blur-md opacity-50 group-hover:opacity-80 transition-opacity" />
-            </button>
         </div>
     )
 }

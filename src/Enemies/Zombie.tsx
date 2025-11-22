@@ -181,8 +181,8 @@ export function Zombie({ spawnPoint }: ZombieProps) {
             if (attackStartRef.current !== null) {
                 const elapsed = (performance.now() - attackStartRef.current) / 1000
                 
-                // Attempt damage halfway through
-                if (!attackAppliedRef.current && elapsed >= attackDurationRef.current * 0.4) {
+                // Attempt damage at 90% of animation
+                if (!attackAppliedRef.current && elapsed >= attackDurationRef.current * 0.9) {
                     // Check hit range (slightly forgiving)
                     if (flatLen < ATTACK_RANGE + 0.5) {
                         attackAppliedRef.current = true

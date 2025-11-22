@@ -49,14 +49,6 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     const [flyMode, setFlyMode] = useState(false)
     const stepBuffers = useRef<AudioBuffer[]>([])
 
-    // Initialize player on server (Nickname only)
-    useEffect(() => {
-        if (socket) {
-            // We don't send characterIndex anymore, server assigns it
-            socket.emit('initPlayer', { nickname: useGameStore.getState().nickname })
-        }
-    }, [socket])
-
     const setAudioListener = useVoiceStore((state) => state.setAudioListener)
     const audioListener = useVoiceStore((state) => state.audioListener)
 
@@ -168,6 +160,12 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
 
     useFrame((_state, delta) => {
         if (!body.current) return
+
+        // If not actively playing, freeze physics and skip networking
+        if (useGameStore.getState().phase !== 'PLAYING') {
+            body.current.setLinvel({ x: 0, y: 0, z: 0 }, true)
+            return
+        }
 
         // Keep player safe while map loads
         if (!mapLoaded) {
@@ -369,7 +367,8 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             quaternionToSend = [q.x, q.y, q.z, q.w]
         }
 
-        if (socket && now - lastEmitTime.current > 8) { // ~120 updates per second
+        const currentRoomId = useGameStore.getState().currentRoomId
+        if (socket && currentRoomId && now - lastEmitTime.current > 30) { // ~33 updates per second
             lastEmitTime.current = now
 
             socket.emit('playerMove', {

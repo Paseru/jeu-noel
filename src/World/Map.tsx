@@ -1,6 +1,6 @@
 import { useGLTF } from '@react-three/drei'
 import { RigidBody } from '@react-three/rapier'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { useGameStore } from '../stores/useGameStore'
 
@@ -13,13 +13,14 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
     const setMapLoaded = useGameStore((state) => state.setMapLoaded)
 
     // Signal map readiness
-    useMemo(() => {
+    useEffect(() => {
         setMapLoaded(true)
         return () => setMapLoaded(false)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [modelPath, setMapLoaded])
 
-    console.log("MapContent mounted. ModelPath:", modelPath, "Scale:", scale)
+    useEffect(() => {
+        console.log("MapContent mounted. ModelPath:", modelPath, "Scale:", scale)
+    }, [modelPath, scale])
 
     // Extract plants and DOORS to separate groups
     const { solidScene, plantScene, doors } = useMemo(() => {
