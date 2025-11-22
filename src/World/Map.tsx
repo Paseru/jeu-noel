@@ -10,6 +10,14 @@ import { Door } from './Door'
 // This component MUST only be rendered when modelPath is valid
 const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) => {
     const { scene } = useGLTF(modelPath)
+    const setMapLoaded = useGameStore((state) => state.setMapLoaded)
+
+    // Signal map readiness
+    useMemo(() => {
+        setMapLoaded(true)
+        return () => setMapLoaded(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [modelPath, setMapLoaded])
 
     console.log("MapContent mounted. ModelPath:", modelPath, "Scale:", scale)
 

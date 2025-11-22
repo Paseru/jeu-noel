@@ -45,6 +45,8 @@ interface GameState {
     players: Record<string, PlayerState>
     isPlayerDead: boolean
     setPlayerDead: (dead: boolean) => void
+    mapLoaded: boolean
+    setMapLoaded: (loaded: boolean) => void
     messages: ChatMessage[]
     rooms: Room[]
     currentRoomId: string | null
@@ -111,6 +113,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     players: {},
     isPlayerDead: false,
     setPlayerDead: (dead) => set({ isPlayerDead: dead }),
+    mapLoaded: false,
+    setMapLoaded: (loaded) => set({ mapLoaded: loaded }),
     messages: [],
     rooms: [],
     currentRoomId: null,

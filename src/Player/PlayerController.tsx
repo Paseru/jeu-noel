@@ -40,6 +40,8 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     const [cameraMode, setCameraMode] = useState<'FIRST' | 'THIRD'>('FIRST')
     const [isMoving, setIsMoving] = useState(false)
     const [isRunning, setIsRunning] = useState(false)
+    const mapLoaded = useGameStore((state) => state.mapLoaded)
+    const wasMapLoaded = useRef(false)
 
     // Debug / Fly Mode
     const [flyMode, setFlyMode] = useState(false)
@@ -123,6 +125,24 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
 
     useFrame((_state, delta) => {
         if (!body.current) return
+
+        // Keep player safe while map loads
+        if (!mapLoaded) {
+            wasMapLoaded.current = false
+            body.current.setGravityScale(0, true)
+            body.current.setLinvel({ x: 0, y: 0, z: 0 }, true)
+            // Pin to spawn to avoid drifting
+            const room = useGameStore.getState().rooms.find(r => r.id === useGameStore.getState().currentRoomId)
+            const spawn = room?.spawnPoint || [0, 10, 0]
+            body.current.setTranslation({ x: spawn[0], y: spawn[1], z: spawn[2] }, true)
+            return
+        }
+
+        // Re-enable gravity once after load
+        if (!wasMapLoaded.current) {
+            wasMapLoaded.current = true
+            body.current.setGravityScale(1, true)
+        }
 
         const keys = getKeys()
         // Disable movement if chat is open or settings/menu is open

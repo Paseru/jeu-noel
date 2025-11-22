@@ -9,7 +9,6 @@ import { useGameStore } from '../stores/useGameStore'
 
 const RUN_SPEED = 3.6
 const ATTACK_RANGE = 1.0
-const ATTACK_EARLY_TIME = 1.0 // seconds of anticipation
 
 type ZombieState = 'idle' | 'run' | 'attack'
 
@@ -105,13 +104,9 @@ export function Zombie({ spawnPoint }: ZombieProps) {
             body.setLinvel({ x: 0, y: body.linvel().y, z: 0 }, true)
             if (nearestTarget.id === localId && !useGameStore.getState().isPlayerDead) {
                 setPlayerDead(true)
+                if (document.pointerLockElement) document.exitPointerLock()
             }
             return
-        }
-
-        // Start attack animation a bit earlier while approaching (same hit zone)
-        if (flatLen < ATTACK_RANGE + RUN_SPEED * ATTACK_EARLY_TIME) {
-            playState('attack')
         }
 
         // Normalized forward direction

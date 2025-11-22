@@ -1,9 +1,17 @@
+import { useEffect } from 'react'
 import { useGameStore } from '../stores/useGameStore'
 
 export const DeathScreen = () => {
     const { setPhase, setPlayerDead, isPlayerDead } = useGameStore()
 
     if (!isPlayerDead) return null
+
+    // Ensure cursor is free while dead
+    useEffect(() => {
+        if (document.pointerLockElement) {
+            document.exitPointerLock()
+        }
+    }, [])
 
     const handleBackToMenu = () => {
         setPlayerDead(false)
@@ -15,10 +23,12 @@ export const DeathScreen = () => {
     return (
         <div className="absolute inset-0 z-[1200] flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm">
             <div className="text-center mb-10 animate-in fade-in duration-300">
-                <h1 className="text-6xl md:text-7xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white to-white/50 drop-shadow-2xl uppercase">
+                <h1 className="text-8xl landscape:text-6xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60 drop-shadow-2xl uppercase">
                     You Are Dead
                 </h1>
-                <p className="text-white/70 mt-3 text-lg font-mono tracking-[0.3em] uppercase">Devoured by the horde</p>
+                <p className="text-white/60 text-xl landscape:text-lg font-mono tracking-[0.5em] mt-4 uppercase">
+                    Back to safety
+                </p>
             </div>
 
             <button
