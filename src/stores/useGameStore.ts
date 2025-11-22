@@ -89,6 +89,14 @@ interface GameState {
     sendMessage: (text: string) => void
     addChatMessage: (message: ChatMessage) => void
 
+    // Local player transform (kept client-side so AI can target self)
+    setLocalPlayerTransform: (
+        position: [number, number, number],
+        quaternion: [number, number, number, number],
+        isMoving: boolean,
+        isRunning: boolean
+    ) => void
+
     // Interaction System
     interactionText: string | null
     setInteractionText: (text: string | null) => void
@@ -300,6 +308,27 @@ export const useGameStore = create<GameState>((set, get) => ({
         return { players: rest }
     }),
     setPlayers: (players) => set({ players }),
+
+    setLocalPlayerTransform: (position, quaternion, isMoving, isRunning) => set((state) => {
+        const { playerId, nickname, myCharacterIndex } = state
+        if (!playerId) return state
+        const existing = state.players[playerId]
+        return {
+            players: {
+                ...state.players,
+                [playerId]: {
+                    id: playerId,
+                    position,
+                    quaternion,
+                    isMoving,
+                    isRunning,
+                    nickname: existing?.nickname || nickname || 'Player',
+                    isSpeaking: existing?.isSpeaking || false,
+                    characterIndex: existing?.characterIndex || myCharacterIndex
+                }
+            }
+        }
+    }),
 
     // Interaction System
     interactionText: null,

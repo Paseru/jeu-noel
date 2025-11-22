@@ -11,6 +11,7 @@ import VoiceChatManager from './components/VoiceChatManager'
 import { useGameStore } from './stores/useGameStore'
 import { useVoiceStore } from './stores/useVoiceStore'
 import MobileControls from './UI/MobileControls'
+import { ZombieSpawnButton } from './components/ZombieSpawnButton'
 import { InteractionPrompt } from './UI/InteractionPrompt'
 import PlayerList from './UI/PlayerList'
 
@@ -177,6 +178,8 @@ export default function App() {
                     {!isSettingsOpen && !isPauseMenuOpen && !isPlayerListOpen && (
                         <MobileControls onOpenMenu={() => setIsPauseMenuOpen(true)} />
                     )}
+
+                    <ZombieSpawnButton />
 
                     <InteractionPrompt />
 

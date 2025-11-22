@@ -270,26 +270,26 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
 
         // Socket Update (Throttled to ~120Hz)
         const now = Date.now()
+        // Calculate rotation to send (Quaternion)
+        let quaternionToSend: [number, number, number, number] = [0, 0, 0, 1]
+        if (cameraMode === 'THIRD' && characterRef.current) {
+            const q = characterRef.current.quaternion
+            quaternionToSend = [q.x, q.y, q.z, q.w]
+        } else {
+            const direction = new THREE.Vector3()
+            camera.getWorldDirection(direction)
+            direction.y = 0 // Flatten to XZ plane
+            direction.normalize()
+
+            const angle = Math.atan2(direction.x, direction.z)
+            const q = new THREE.Quaternion()
+            q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle)
+
+            quaternionToSend = [q.x, q.y, q.z, q.w]
+        }
+
         if (socket && now - lastEmitTime.current > 8) { // ~120 updates per second
             lastEmitTime.current = now
-
-            // Calculate rotation to send (Quaternion)
-            let quaternionToSend = [0, 0, 0, 1]
-            if (cameraMode === 'THIRD' && characterRef.current) {
-                const q = characterRef.current.quaternion
-                quaternionToSend = [q.x, q.y, q.z, q.w]
-            } else {
-                const direction = new THREE.Vector3()
-                camera.getWorldDirection(direction)
-                direction.y = 0 // Flatten to XZ plane
-                direction.normalize()
-
-                const angle = Math.atan2(direction.x, direction.z)
-                const q = new THREE.Quaternion()
-                q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle)
-
-                quaternionToSend = [q.x, q.y, q.z, q.w]
-            }
 
             socket.emit('playerMove', {
                 position: [translation.x, translation.y, translation.z],
@@ -298,6 +298,14 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
                 isRunning: run
             })
         }
+
+        // Keep local store in sync for AI (zombies) to find the nearest player (including self)
+        useGameStore.getState().setLocalPlayerTransform(
+            [translation.x, translation.y, translation.z],
+            quaternionToSend,
+            moving,
+            run
+        )
 
         // Jump Logic (Only when NOT flying)
         if (jump && !flyMode) {
