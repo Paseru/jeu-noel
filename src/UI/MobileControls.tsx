@@ -1,4 +1,3 @@
-```
 import { useRef, useState } from 'react'
 import { useGameStore } from '../stores/useGameStore'
 
@@ -155,31 +154,30 @@ export default function MobileControls({ onOpenMenu }: MobileControlsProps) {
                     e.stopPropagation()
                     setSpeaking(!isSpeaking)
                 }}
-                className={`absolute left - 8 w - 14 h - 14 rounded - full flex items - center justify - center backdrop - blur - md border transition - all pointer - events - auto active: scale - 95 z - [2001] ${
-    isSpeaking
-        ? 'bg-green-500/80 border-green-400 text-white shadow-[0_0_15px_rgba(74,222,128,0.5)]'
-        : 'bg-black/40 border-white/20 text-white/60'
-} `}
+                className={`absolute left-8 w-14 h-14 rounded-full flex items-center justify-center backdrop-blur-md border transition-all pointer-events-auto active:scale-95 z-[2001] ${isSpeaking
+                    ? 'bg-green-500/80 border-green-400 text-white shadow-[0_0_15px_rgba(74,222,128,0.5)]'
+                    : 'bg-black/40 border-white/20 text-white/60'
+                    }`}
                 style={{
                     bottom: 'calc(max(2rem, env(safe-area-inset-bottom)) + 12rem)' // Positioned above joystick
                 }}
             >
                 {isSpeaking ? (
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7">
-                        <path d="M12.25 4.5a3.75 3.75 0 117.5 0v8.25a3.75 3.75 0 11-7.5 0V4.5z" />
-                        <path d="M10 10.5a.75.75 0 01.75.75v1.5a5.25 5.25 0 1010.5 0v-1.5a.75.75 0 011.5 0v1.5a6.751 6.751 0 01-6 6.709v2.291h3a.75.75 0 010 1.5h-7.5a.75.75 0 010-1.5h3v-2.291a6.751 6.751 0 01-6-6.709v-1.5A.75.75 0 0110 10.5z" />
+                        <path d="M8.25 4.5a3.75 3.75 0 117.5 0v8.25a3.75 3.75 0 11-7.5 0V4.5z" />
+                        <path d="M6 10.5a.75.75 0 01.75.75v1.5a5.25 5.25 0 1010.5 0v-1.5a.75.75 0 011.5 0v1.5a6.751 6.751 0 01-6 6.709v2.291h3a.75.75 0 010 1.5h-7.5a.75.75 0 010-1.5h3v-2.291a6.751 6.751 0 01-6-6.709v-1.5A.75.75 0 016 10.5z" />
                     </svg>
                 ) : (
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7">
-                        <path d="M8.25 4.5a3.75 3.75 0 117.5 0v8.25a3.75 3.75 0 11-7.5 0V4.5z" />
-                        <path d="M6 10.5a.75.75 0 01.75.75v1.5a5.25 5.25 0 1010.5 0v-1.5a.75.75 0 011.5 0v1.5a6.751 6.751 0 01-6 6.709v2.291h3a.75.75 0 010 1.5h-7.5a.75.75 0 010-1.5h3v-2.291a6.751 6.751 0 01-6-6.709v-1.5A.75.75 0 016 10.5z" />
+                        <path d="M12.25 4.5a3.75 3.75 0 117.5 0v8.25a3.75 3.75 0 11-7.5 0V4.5z" />
+                        <path d="M10 10.5a.75.75 0 01.75.75v1.5a5.25 5.25 0 1010.5 0v-1.5a.75.75 0 011.5 0v1.5a6.751 6.751 0 01-6 6.709v2.291h3a.75.75 0 010 1.5h-7.5a.75.75 0 010-1.5h3v-2.291a6.751 6.751 0 01-6-6.709v-1.5A.75.75 0 0110 10.5z" />
                         <path fillRule="evenodd" d="M3.53 2.47a.75.75 0 00-1.06 1.06l18 18a.75.75 0 101.06-1.06l-18-18zM20.25 12.75a.75.75 0 00-1.5 0v1.5c0 .409-.02.812-.058 1.209l1.495 1.495c.042-.886.063-1.786.063-2.704v-1.5z" clipRule="evenodd" />
                     </svg>
                 )}
             </button>
 
             {/* Jump and Sprint Buttons (Bottom Right) */}
-            <div 
+            <div
                 className="absolute right-8 flex gap-4 pointer-events-auto z-[2001]"
                 style={{
                     bottom: 'max(2rem, env(safe-area-inset-bottom))'
@@ -238,7 +236,7 @@ export default function MobileControls({ onOpenMenu }: MobileControlsProps) {
                     <div
                         className="w-16 h-16 rounded-full bg-white/50 shadow-lg absolute"
                         style={{
-                            transform: `translate(${ joystickPos.x }px, ${ joystickPos.y }px)`,
+                            transform: `translate(${joystickPos.x}px, ${joystickPos.y}px)`,
                             transition: isDragging ? 'none' : 'transform 0.1s ease-out'
                         }}
                     />

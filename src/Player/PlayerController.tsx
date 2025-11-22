@@ -126,15 +126,15 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
 
         const keys = getKeys()
         // Disable movement if chat is open or settings/menu is open
-        const { forward, backward, left, right, jump, run } = (isChatOpen || isSettingsOpen)
+        const { forward, backward, left, right, jump: keyJump, run: keyRun } = (isChatOpen || isSettingsOpen)
             ? { forward: false, backward: false, left: false, right: false, jump: false, run: false }
             : keys
 
         const { joystick, lookDelta, isJumping, isRunning: isMobileRunning } = mobileInput
 
         // Combine keyboard and mobile inputs
-        const jump = keys.jump || isJumping
-        const run = keys.run || isMobileRunning
+        const jump = keyJump || isJumping
+        const run = keyRun || isMobileRunning
 
         const velocity = body.current.linvel()
         const translation = body.current.translation()
