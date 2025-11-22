@@ -28,6 +28,10 @@ export function Zombie({ spawnPoint }: ZombieProps) {
     const attackDurationRef = useRef<number>(1)
     const attackAppliedRef = useRef<boolean>(false)
     const attackLockUntilRef = useRef<number>(0) // timestamp in ms
+    const attackClipDuration = useMemo(() => {
+        const clip = animations.find(a => a.name.toLowerCase().includes('attack'))
+        return clip?.duration || 1.167
+    }, [animations])
 
     // Helper to find actions by partial name (case insensitive)
     const findAction = (name: string) => {
@@ -61,7 +65,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         }
         if (next === 'attack') {
             const now = performance.now()
-            const clipDuration = attack?.getClip()?.duration || 1
+            const clipDuration = attack?.getClip()?.duration || attackClipDuration
             if (now < attackLockUntilRef.current) return // prevent spam/restart while attack is active
             attackLockUntilRef.current = now + clipDuration * 1000
 
@@ -124,6 +128,11 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         if (flatLen < ATTACK_RANGE) {
             if (currentState !== 'attack') {
                 playState('attack')
+            } else if (attackStartRef.current === null) {
+                // Ensure we still have a start time even if lock prevented a restart
+                attackStartRef.current = performance.now()
+                attackDurationRef.current = attackClipDuration
+                attackAppliedRef.current = false
             }
             body.setLinvel({ x: 0, y: body.linvel().y, z: 0 }, true)
         } else {
@@ -134,7 +143,6 @@ export function Zombie({ spawnPoint }: ZombieProps) {
 
         // Apply damage halfway through the attack animation if still in range
         if (
-            currentState === 'attack' &&
             attackStartRef.current !== null &&
             !attackAppliedRef.current
         ) {
@@ -147,31 +155,36 @@ export function Zombie({ spawnPoint }: ZombieProps) {
                     if (document.pointerLockElement) document.exitPointerLock()
                 }
             }
+            // If animation finished with no hit, unlock to chase again
+            if (elapsed >= attackDurationRef.current) {
+                attackStartRef.current = null
+                attackAppliedRef.current = false
+            }
         }
 
         // Normalized forward direction
         dir.y = 0
         dir.normalize()
 
-        // Simple obstacle avoidance: raycast forward, then left/right if blocked
-        const desired = new rapier.Vector3(dir.x, 0, dir.z)
-        const forwardRay = new rapier.Ray(origin, desired)
-        const forwardHit = world.castRay(forwardRay, 0.9, true) as any
+        // Obstacle avoidance: sample three rays (forward, 30° left/right) and pick the freest
+        const sampleDirs = [
+            dir.clone(),
+            dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 6),
+            dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 6),
+        ]
+        let bestDir = dir.clone()
+        let bestScore = -Infinity
+        sampleDirs.forEach(d => {
+            const ray = new rapier.Ray(origin, new rapier.Vector3(d.x, 0, d.z))
+            const hit = world.castRay(ray, 1.6, true) as any
+            const score = hit ? hit.toi : 2 // farther is better
+            if (score > bestScore) {
+                bestScore = score
+                bestDir = d
+            }
+        })
 
-        let moveDir = dir.clone()
-
-        if (forwardHit && forwardHit.toi < 0.9) {
-            const left = new THREE.Vector3(-dir.z, 0, dir.x).normalize()
-            const right = new THREE.Vector3(dir.z, 0, -dir.x).normalize()
-
-            const leftHit = world.castRay(new rapier.Ray(origin, new rapier.Vector3(left.x, 0, left.z)), 0.9, true) as any
-            const rightHit = world.castRay(new rapier.Ray(origin, new rapier.Vector3(right.x, 0, right.z)), 0.9, true) as any
-
-            if (!leftHit && rightHit) moveDir = left
-            else if (!rightHit && leftHit) moveDir = right
-            else if (!leftHit && !rightHit) moveDir = Math.random() > 0.5 ? left : right
-            // if both blocked, keep original dir (it will push softly)
-        }
+        const moveDir = bestDir.normalize()
 
         // Apply velocity
         body.setLinvel({
