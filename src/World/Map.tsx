@@ -25,6 +25,10 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
 
     // Extract plants and DOORS to separate groups
     const { solidScene, plantScene, doors } = useMemo(() => {
+        // Safety: if GLTF not ready yet (edge cases outside Suspense), return empty scenes
+        if (!scene) {
+            return { solidScene: new THREE.Scene(), plantScene: new THREE.Scene(), doors: [] as THREE.Object3D[] }
+        }
         // Clone the scene to avoid mutating the cached GLTF result
         const clonedScene = scene.clone()
 
