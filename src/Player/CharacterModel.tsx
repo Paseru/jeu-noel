@@ -84,8 +84,10 @@ export default function CharacterModel({
         }
     }, [playerId, stream, audioListener, voiceVolume])
 
+    // Smooth action switching to avoid momentary T-poses on key press
+    const activeActionRef = useRef<THREE.AnimationAction | null>(null)
+
     useEffect(() => {
-        // Helper to find animation by name (case insensitive, partial match)
         const findAction = (name: string) => {
             const clip = animations.find(a => a.name.toLowerCase().includes(name.toLowerCase()))
             return clip ? actions[clip.name] : null
@@ -93,42 +95,40 @@ export default function CharacterModel({
 
         if (!animations.length || !Object.keys(actions).length) return
 
-        const runAction = findAction('run') || actions[Object.keys(actions)[2]] // Fallback to 3rd anim
-        const walkAction = findAction('walk') || actions[Object.keys(actions)[1]] // Fallback to 2nd anim
-        const idleAction = findAction('idle') || actions[Object.keys(actions)[0]] // Fallback to 1st anim
+        const runAction = findAction('run') || actions[Object.keys(actions)[2]]
+        const walkAction = findAction('walk') || actions[Object.keys(actions)[1]]
+        const idleAction = findAction('idle') || actions[Object.keys(actions)[0]]
 
-        const playExclusive = (action?: THREE.AnimationAction | null) => {
-            if (!action) return
-            Object.values(actions).forEach(a => {
-                if (a && a !== action) a.stop()
-            })
-            action.reset().fadeIn(0.15).play()
+        const switchTo = (next?: THREE.AnimationAction | null) => {
+            if (!next) return
+            const current = activeActionRef.current
+            if (current === next) return
+
+            next.reset().fadeIn(0.12).play()
+            if (current) current.fadeOut(0.1)
+            activeActionRef.current = next
         }
 
         if (isMoving) {
             if (isRunning && runAction) {
-                playExclusive(runAction)
+                switchTo(runAction)
             } else if (walkAction) {
-                playExclusive(walkAction)
+                switchTo(walkAction)
             } else if (runAction) {
-                playExclusive(runAction)
+                switchTo(runAction)
             }
         } else {
-            playExclusive(idleAction)
-        }
-
-        return () => {
-            // Keep current action; next effect run will replace if needed
+            switchTo(idleAction)
         }
     }, [isMoving, isRunning, actions, animations, characterIndex, phase, currentRoomId])
 
-    // Safety: if mixer is idle (e.g., after respawn or room change), kick idle once
+    // Safety: ensure an action is playing after respawn / room switch
     useEffect(() => {
         if (!animations.length || !Object.keys(actions).length) return
         const idleAction = actions[animations[0]?.name] || actions[Object.keys(actions)[0]]
-        if (idleAction) {
-            Object.values(actions).forEach(a => a?.stop())
+        if (!activeActionRef.current && idleAction) {
             idleAction.reset().fadeIn(0.12).play()
+            activeActionRef.current = idleAction
         }
     }, [animations, actions, phase, currentRoomId, isPlayerDead])
 

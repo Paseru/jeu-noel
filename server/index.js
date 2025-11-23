@@ -15,6 +15,7 @@ const ROOMS = [
         name: "Snowy Village",
         mapImage: "/maps/Snowy Village.jpg",
         modelPath: "/models/snowy_village_ps1_environment.glb",
+        navMeshPath: "/navmesh/navmesh_snowy_village.glb",
         maxPlayers: 40,
         spawnPoint: [1.98, 9.55, -11.47],
         zombieSpawnPoint: [47.74, 13.03, -140.37],
@@ -25,10 +26,22 @@ const ROOMS = [
         name: "Tacos World",
         mapImage: "/maps/Tacos.jpg",
         modelPath: "/models/tacos (1).glb",
+        navMeshPath: "/navmesh/navmesh_tacos.glb",
         maxPlayers: 40,
         spawnPoint: [-0.13, 2.06, 16.38],
         zombieSpawnPoint: [-73.19, 4.78, -17.39],
         summonPoint: [12.30, 0.66, 9.29]
+    },
+    {
+        id: "server-farm",
+        name: "Farm",
+        mapImage: "/maps/Farm.jpg",
+        modelPath: "/models/farm_map.glb",
+        navMeshPath: "/models/farm_map_navmesh.glb",
+        maxPlayers: 40,
+        spawnPoint: [6.74, 4.5, -1.4],
+        zombieSpawnPoint: [-80, 4.0, -80],
+        summonPoint: [6.74, 2.5, -1.4]
     }
 ];
 

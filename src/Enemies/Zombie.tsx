@@ -159,15 +159,20 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         const room = rooms.find(r => r.id === currentRoomId)
         const model = room?.modelPath?.toLowerCase() || ''
 
-        let path = NAVMESH_PATH
-        if (model.includes('taco')) path = '/navmesh/navmesh_tacos.glb'
-        else if (model.includes('snow')) path = NAVMESH_PATH
-        else if (model) {
-            const base = model.split('/').pop()?.replace(/\.(gltf|glb)$/i, '') || 'navmesh'
-            path = `/navmesh/${base}.glb`
+        // Priorité au chemin explicite fourni par la salle (plus fiable que les heuristiques sur le nom du fichier)
+        let path = room?.navMeshPath
+
+        // Fallbacks pour compatibilité rétro et vieilles rooms sans navMeshPath
+        if (!path) {
+            if (model.includes('taco')) path = '/navmesh/navmesh_tacos.glb'
+            else if (model.includes('snow')) path = NAVMESH_PATH
+            else if (model) {
+                const base = model.split('/').pop()?.replace(/\.(gltf|glb)$/i, '') || 'navmesh'
+                path = `/navmesh/${base}.glb`
+            }
         }
 
-        setNavMeshPath(path)
+        setNavMeshPath(path || NAVMESH_PATH)
         yukaNavMeshRef.current = null
         pathRef.current = []
         waypointIndexRef.current = 0

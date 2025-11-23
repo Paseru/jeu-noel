@@ -33,6 +33,7 @@ interface Room {
     name: string
     mapImage: string
     modelPath: string
+    navMeshPath?: string
     maxPlayers: number
     playerCount: number
     scale?: number
