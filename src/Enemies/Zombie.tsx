@@ -41,7 +41,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
     const agonyBufferRef = useRef<AudioBuffer | null>(null)
     const wasCloseRef = useRef<boolean>(false)
     const [navMeshPath, setNavMeshPath] = useState<string>(NAVMESH_PATH)
-    const yukaNavMeshRef = useRef<YUKA.NavMesh | null>(null)
+    const yukaNavMeshRef = useRef<any | null>(null)
     const pathRef = useRef<THREE.Vector3[]>([])
     const waypointIndexRef = useRef<number>(0)
     const lastTargetRef = useRef<THREE.Vector3 | null>(null)
@@ -178,7 +178,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         let cancelled = false
         if (!navMeshPath) return
         const loader = new YUKA.NavMeshLoader()
-        loader.load(navMeshPath).then(navMesh => {
+        loader.load(navMeshPath).then((navMesh: any) => {
             if (cancelled) return
             yukaNavMeshRef.current = navMesh
             console.info('[Zombie] yuka navmesh loaded', navMeshPath)
@@ -201,7 +201,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         const path = nav.findPath(fromRegion ? fromRegion.centroid : from, toRegion ? toRegion.centroid : to)
 
         if (path && path.length > 0) {
-            pathRef.current = path.map(p => new THREE.Vector3(p.x, p.y, p.z))
+            pathRef.current = path.map((p: any) => new THREE.Vector3(p.x, p.y, p.z))
             waypointIndexRef.current = 0
             lastTargetRef.current = target.clone()
             lastReplanRef.current = performance.now()
