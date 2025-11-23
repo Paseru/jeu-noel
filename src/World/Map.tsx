@@ -58,10 +58,29 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
                     }
                 })
 
-                // For the House map, keep all meshes in the solid collider to avoid holes.
-                if (isHouseMap) return
-
                 const name = child.name.toLowerCase()
+
+                // Detect doors and detach them so we can animate them independently
+                const isDoor = name.includes('door')
+                if (isDoor) {
+                    const worldPos = new THREE.Vector3()
+                    const worldQuat = new THREE.Quaternion()
+                    const worldScale = new THREE.Vector3()
+                    child.getWorldPosition(worldPos)
+                    child.getWorldQuaternion(worldQuat)
+                    child.getWorldScale(worldScale)
+
+                    if (child.parent) child.parent.remove(child)
+                    child.position.copy(worldPos)
+                    child.quaternion.copy(worldQuat)
+                    child.scale.copy(worldScale)
+
+                    doorsToMove.push(child)
+                    return
+                }
+
+                // For the House map, keep everything else solid to avoid collider holes
+                if (isHouseMap) return
 
                 const isPlantOrTree = name.includes('grass') || name.includes('flower') || name.includes('plant') || name.includes('leaf') || name.includes('vegetation') || name.includes('tree') || name.includes('pine') || name.includes('spruce')
                 const isRock = name.includes('rock') || name.includes('stone') || name.includes('cliff') || name.includes('boulder') || name.includes('mountain') || name.includes('ice') || name.includes('log') || name.includes('stump')
@@ -91,13 +110,8 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
             child.scale.copy(worldScale)
         })
 
-        // Move doors
+        // Collect doors (they already carry world transforms)
         doorsToMove.forEach(child => {
-            // We need to preserve the transform relative to the map origin
-            // Since we are removing it from the hierarchy, we need its world transform
-            // BUT, we will be rendering it inside the MapContent which is already scaled.
-            // The Door component expects an object. We should probably just detach it.
-
             if (child.parent) child.parent.remove(child)
             doorObjects.push(child)
         })
