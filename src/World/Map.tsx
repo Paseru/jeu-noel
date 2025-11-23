@@ -12,7 +12,6 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
     const gltf: any = useGLTF(modelPath)
     const scene = gltf?.scene as THREE.Scene | undefined
     const setMapLoaded = useGameStore((state) => state.setMapLoaded)
-    const isHouseMap = modelPath.toLowerCase().includes('house_map')
 
     // Signal map readiness
     useEffect(() => {
@@ -72,14 +71,16 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
                     return
                 }
 
-                // For the House map, keep everything else solid to avoid collider holes
-                if (isHouseMap) return
-
                 const isPlantOrTree = name.includes('grass') || name.includes('flower') || name.includes('plant') || name.includes('leaf') || name.includes('vegetation') || name.includes('tree') || name.includes('pine') || name.includes('spruce')
                 const isRock = name.includes('rock') || name.includes('stone') || name.includes('cliff') || name.includes('boulder') || name.includes('mountain') || name.includes('ice') || name.includes('log') || name.includes('stump')
 
                 if (isPlantOrTree && !isRock) {
-                    plantsToMove.push(child)
+                    // Avoid stripping flat ground (e.g., grass floors). Only move tall vegetation.
+                    const bbox = new THREE.Box3().setFromObject(child)
+                    const height = bbox.max.y - bbox.min.y
+                    if (height > 1.0) {
+                        plantsToMove.push(child)
+                    }
                 }
             }
         })
