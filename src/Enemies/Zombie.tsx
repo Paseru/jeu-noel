@@ -7,7 +7,9 @@ import * as THREE from 'three'
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 // @ts-ignore three-pathfinding n'a pas de typings TS
-import { Pathfinding } from 'three-pathfinding'
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import RecastModule from 'recast-detour'
 import { useGameStore } from '../stores/useGameStore'
 import { useVoiceStore } from '../stores/useVoiceStore'
 import { AudioLoader, PositionalAudio } from 'three'
@@ -15,7 +17,80 @@ import { AudioLoader, PositionalAudio } from 'three'
 const RUN_SPEED = 5
 const ATTACK_RANGE = 1.0
 const NAVMESH_PATH = '/navmesh/navmesh.glb'
-const NAV_ZONE_ID = 'level'
+
+type CrowdBundle = {
+    recast: any,
+    nav: any,
+    crowd: any,
+    lastUpdateTime: number
+}
+
+const crowdCache: Record<string, CrowdBundle> = {}
+let recastPromise: Promise<any> | null = null
+
+const loadRecast = () => {
+    if (!recastPromise) {
+        recastPromise = Promise.resolve(RecastModule).then((mod: any) =>
+            typeof mod === 'function' ? mod() : mod
+        )
+    }
+    return recastPromise
+}
+
+const geometryToVerts = (geom: THREE.BufferGeometry) => {
+    const pos = geom.getAttribute('position')
+    const idxAttr = geom.getIndex()
+    const vertices = Array.from(pos.array as Iterable<number>)
+    const indices = idxAttr ? Array.from(idxAttr.array as Iterable<number>) : Array.from({ length: pos.count }, (_, i) => i)
+    return { vertices, indices }
+}
+
+const buildCrowdForNavmesh = async (key: string, geometry: THREE.BufferGeometry): Promise<CrowdBundle> => {
+    if (crowdCache[key]) return crowdCache[key]
+    const recast = await loadRecast()
+    const { vertices, indices } = geometryToVerts(geometry)
+
+    const cfg = new recast.rcConfig()
+    // Basic params; navmesh already carved, so coarse settings are fine
+    cfg.cs = 0.2
+    cfg.ch = 0.2
+    cfg.walkableSlopeAngle = 50
+    cfg.walkableHeight = 2
+    cfg.walkableClimb = 0.5
+    cfg.walkableRadius = 0.35
+    cfg.maxEdgeLen = 12
+    cfg.maxSimplificationError = 1.3
+    cfg.minRegionArea = 8
+    cfg.mergeRegionArea = 20
+    cfg.maxVertsPerPoly = 6
+    cfg.detailSampleDist = 6
+    cfg.detailSampleMaxError = 1
+
+    // Compute bounds from vertices
+    let minx = Infinity, miny = Infinity, minz = Infinity
+    let maxx = -Infinity, maxy = -Infinity, maxz = -Infinity
+    for (let i = 0; i < vertices.length; i += 3) {
+        const x = vertices[i], y = vertices[i + 1], z = vertices[i + 2]
+        if (x < minx) minx = x
+        if (y < miny) miny = y
+        if (z < minz) minz = z
+        if (x > maxx) maxx = x
+        if (y > maxy) maxy = y
+        if (z > maxz) maxz = z
+    }
+    cfg.bmin = { x: minx, y: miny, z: minz }
+    cfg.bmax = { x: maxx, y: maxy, z: maxz }
+
+    const nav = new recast.NavMesh()
+    nav.build(vertices, vertices.length / 3, indices, indices.length, cfg)
+
+    const crowd = new recast.Crowd(32, cfg.walkableRadius, nav.getNavMesh())
+    crowd.setDefaultQueryExtent(new recast.Vec3(2, 4, 2))
+
+    const bundle: CrowdBundle = { recast, nav, crowd, lastUpdateTime: -1 }
+    crowdCache[key] = bundle
+    return bundle
+}
 
 type ZombieState = 'idle' | 'run' | 'attack'
 
@@ -45,16 +120,8 @@ export function Zombie({ spawnPoint }: ZombieProps) {
     const wasCloseRef = useRef<boolean>(false)
     const [navMeshPath, setNavMeshPath] = useState<string>(NAVMESH_PATH)
     const [navMeshGeometry, setNavMeshGeometry] = useState<THREE.BufferGeometry | null>(null)
-    const pathfinderRef = useRef<any | null>(null)
-    const pathRef = useRef<THREE.Vector3[]>([])
-    const waypointIndexRef = useRef<number>(0)
-    const lastTargetRef = useRef<THREE.Vector3 | null>(null)
-    const lastReplanRef = useRef<number>(0)
-    const stuckCounterRef = useRef<number>(0)
-    const lastPosRef = useRef<THREE.Vector3 | null>(null)
     const lockIdRef = useRef<string>(`zombie-lock-${Math.random().toString(36).slice(2)}`)
-    const lastWpDistRef = useRef<number | null>(null)
-    const noImproveCounterRef = useRef<number>(0)
+    const agentRef = useRef<{ id: number | null, crowdKey: string | null }>({ id: null, crowdKey: null })
     const killCamTargetRef = useRef<THREE.Vector3 | null>(null)
 
     // Helper to find actions by partial name (case insensitive)
@@ -176,7 +243,6 @@ export function Zombie({ spawnPoint }: ZombieProps) {
 
         setNavMeshPath(path)
         setNavMeshGeometry(null)
-        pathfinderRef.current = null
     }, [currentRoomId, rooms])
 
     // Navmesh loading (silencieux si le fichier est absent)
@@ -205,53 +271,40 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         }
     }, [navMeshPath])
 
-    // Construire le pathfinder une fois le navmesh chargé
+    // Construire le crowd Detour une fois le navmesh chargé et enregistrer un agent
     useEffect(() => {
+        let disposed = false
         if (!navMeshGeometry) return
-        const pf = new Pathfinding()
-        const zone = Pathfinding.createZone(navMeshGeometry)
-        pf.setZoneData(NAV_ZONE_ID, zone)
-        pathfinderRef.current = pf
-    }, [navMeshGeometry])
+        buildCrowdForNavmesh(navMeshPath, navMeshGeometry).then(bundle => {
+            if (disposed) return
+            const recast = bundle.recast
+            const params = new recast.dtCrowdAgentParams()
+            params.radius = 0.35
+            params.height = 2
+            params.maxAcceleration = 12
+            params.maxSpeed = RUN_SPEED + 0.5
+            params.collisionQueryRange = 2
+            params.pathOptimizationRange = 6
+            params.separationWeight = 2
 
-    const projectToNavmesh = (pf: any, pos: THREE.Vector3) => {
-        // Rapprocher Y vers 0 (navmesh est à plat)
-        const flatPos = pos.clone(); flatPos.y = 0
-        let group = pf.getGroup(NAV_ZONE_ID, flatPos)
-        if (group === null || group === undefined) {
-            const nearNode = pf.getClosestNode(flatPos, NAV_ZONE_ID, 0, false)
-            group = nearNode ? pf.getGroup(NAV_ZONE_ID, nearNode.centroid) : 0
+            // Position de spawn projetée sur le navmesh
+            const spawn = new recast.Vec3(spawnPoint[0], 0, spawnPoint[2])
+            const closest = bundle.nav.getClosestPoint(spawn)
+            const agentId = bundle.crowd.addAgent(closest, params)
+            agentRef.current = { id: agentId, crowdKey: navMeshPath }
+        }).catch(err => {
+            console.warn('[Zombie] failed to init crowd', err)
+        })
+
+        return () => {
+            disposed = true
+            const bundle = agentRef.current.crowdKey ? crowdCache[agentRef.current.crowdKey] : null
+            if (bundle && agentRef.current.id !== null && agentRef.current.id !== undefined) {
+                try { bundle.crowd.removeAgent(agentRef.current.id) } catch (e) { /* ignore */ }
+            }
+            agentRef.current = { id: null, crowdKey: null }
         }
-        const node = pf.getClosestNode(flatPos, NAV_ZONE_ID, group, false)
-        if (!node) return null
-        const pt = new THREE.Vector3(node.centroid.x, node.centroid.y, node.centroid.z)
-        return { point: pt, group }
-    }
-
-    const replanPath = (start: THREE.Vector3, target: THREE.Vector3) => {
-        const pf = pathfinderRef.current
-        if (!pf) return false
-
-        const startInfo = projectToNavmesh(pf, start)
-        const targetInfo = projectToNavmesh(pf, target)
-        if (!startInfo || !targetInfo) {
-            console.warn('[Zombie] navmesh projection failed, fallback to raycast')
-            return false
-        }
-
-        const path = pf.findPath(startInfo.point, targetInfo.point, NAV_ZONE_ID, startInfo.group) as THREE.Vector3[] | null
-        if (!path || path.length === 0) {
-            console.warn('[Zombie] navmesh path failed, fallback to raycast')
-            return false
-        }
-
-        pathRef.current = path
-        waypointIndexRef.current = 0
-        lastTargetRef.current = target.clone()
-        lastReplanRef.current = performance.now()
-        console.info('[Zombie] navmesh active', navMeshPath, 'len', path.length)
-        return true
-    }
+    }, [navMeshGeometry, navMeshPath, spawnPoint])
 
     // Calcul direction avec évitement local + slide
     const steerWithAvoidance = (
@@ -344,7 +397,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         return bestDir.normalize()
     }
 
-    useFrame(() => {
+    useFrame((state, delta) => {
         const body = bodyRef.current
         if (!body) return
 
@@ -507,89 +560,52 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         }
 
         // ---------------------------------------------------------
-        // MOVEMENT LOGIC
+        // MOVEMENT LOGIC (Detour Crowd) with fallback
         // ---------------------------------------------------------
         playState('run')
 
-        dir.y = 0
-        const dirNorm = dir.lengthSq() > 0 ? dir.normalize() : new THREE.Vector3(0, 0, 0)
-        let desiredDir = dirNorm.clone()
+        const bundle = agentRef.current.crowdKey ? crowdCache[agentRef.current.crowdKey] : null
+        const agentId = agentRef.current.id
 
-        // Replan si navmesh dispo et cible a bougé / pas de path / path épuisé
-        const targetVec3 = new THREE.Vector3(targetPos[0], pos.y, targetPos[2])
-        const now = performance.now()
-        const targetMoved = lastTargetRef.current ? lastTargetRef.current.distanceTo(targetVec3) > 1 : true
-        const pathEmpty = pathRef.current.length === 0 || waypointIndexRef.current >= pathRef.current.length
-        const replanCooldown = now - lastReplanRef.current > 1500
-        if (pathfinderRef.current && (targetMoved || pathEmpty || replanCooldown)) {
-            replanPath(currentPosVector, targetVec3)
-        }
+        if (bundle && agentId !== null && agentId !== undefined) {
+            const recast = bundle.recast
+            const dest = bundle.nav.getClosestPoint(new recast.Vec3(targetPos[0], 0, targetPos[2]))
+            bundle.crowd.agentGoto(agentId, dest)
 
-        // Suivi de waypoint si path navmesh
-        if (pathRef.current.length > 0 && waypointIndexRef.current < pathRef.current.length) {
-            const waypoint = pathRef.current[waypointIndexRef.current]
-            const toWaypoint = waypoint.clone().sub(currentPosVector)
-            toWaypoint.y = 0
-            const distWp = toWaypoint.length()
-            // Mesure de progrès vers le waypoint pour détecter blocage
-            if (lastWpDistRef.current !== null && distWp > lastWpDistRef.current - 0.05) {
-                noImproveCounterRef.current += 1
-            } else {
-                noImproveCounterRef.current = 0
-            }
-            lastWpDistRef.current = distWp
-
-            if (noImproveCounterRef.current > 30) { // ~0.5s à 60fps
-                replanPath(currentPosVector, targetVec3)
-                waypointIndexRef.current = 0
-                noImproveCounterRef.current = 0
-                // petit pivot pour décrocher
-                desiredDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.random() > 0.5 ? Math.PI / 2 : -Math.PI / 2)
+            const t = state.clock.elapsedTime
+            if (bundle.lastUpdateTime !== t) {
+                bundle.crowd.update(delta || 0.016)
+                bundle.lastUpdateTime = t
             }
 
-            if (distWp < 0.35 && waypointIndexRef.current < pathRef.current.length - 1) {
-                waypointIndexRef.current += 1
+            const agentPos = bundle.crowd.getAgentPosition(agentId)
+            const agentVel = bundle.crowd.getAgentVelocity(agentId)
+
+            body.setTranslation({ x: agentPos.x, y: pos.y, z: agentPos.z }, true)
+            body.setLinvel({ x: agentVel.x, y: body.linvel().y, z: agentVel.z }, true)
+
+            const velDir = new THREE.Vector3(agentVel.x, 0, agentVel.z)
+            if (velDir.lengthSq() > 0.0001 && modelRef.current) {
+                const targetQuat = new THREE.Quaternion()
+                targetQuat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(velDir.x, velDir.z))
+                modelRef.current.quaternion.slerp(targetQuat, 0.25)
             }
-            if (distWp > 0.05) {
-                desiredDir = toWaypoint.normalize()
+        } else {
+            // Fallback: simple steer if crowd not ready
+            dir.y = 0
+            const dirNorm = dir.lengthSq() > 0 ? dir.normalize() : new THREE.Vector3(0, 0, 0)
+            const desiredDir = steerWithAvoidance(dirNorm, pos, world, body.handle)
+            const hasDir = desiredDir.lengthSq() > 0.0001
+            body.setLinvel({
+                x: hasDir ? desiredDir.x * RUN_SPEED : 0,
+                y: body.linvel().y,
+                z: hasDir ? desiredDir.z * RUN_SPEED : 0
+            }, true)
+            if (modelRef.current && hasDir) {
+                const targetQuat = new THREE.Quaternion()
+                targetQuat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(desiredDir.x, desiredDir.z))
+                modelRef.current.quaternion.slerp(targetQuat, 0.2)
             }
-        }
-
-        // Anti stuck : si on ne bouge pas, on replanifie et on ajoute une légère dérive
-        if (lastPosRef.current) {
-            const moved = currentPosVector.clone().sub(lastPosRef.current).lengthSq()
-            if (moved < 0.0004) {
-                stuckCounterRef.current += 1
-                if (stuckCounterRef.current > 45) {
-                    replanPath(currentPosVector, targetVec3)
-                    waypointIndexRef.current = 0
-                    stuckCounterRef.current = 0
-                    // petit pivot aléatoire pour se décrocher
-                    desiredDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.random() > 0.5 ? Math.PI / 2 : -Math.PI / 2)
-                }
-            } else {
-                stuckCounterRef.current = 0
-            }
-        }
-        lastPosRef.current = currentPosVector.clone()
-
-        // Évitement local + slide sur normale
-        desiredDir = steerWithAvoidance(desiredDir, pos, world, body.handle)
-
-        const hasDir = desiredDir.lengthSq() > 0.0001
-
-        // Apply velocity
-        body.setLinvel({
-            x: hasDir ? desiredDir.x * RUN_SPEED : 0,
-            y: body.linvel().y,
-            z: hasDir ? desiredDir.z * RUN_SPEED : 0
-        }, true)
-
-        // Rotate visual model toward movement direction
-        if (modelRef.current && hasDir) {
-            const targetQuat = new THREE.Quaternion()
-            targetQuat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(desiredDir.x, desiredDir.z))
-            modelRef.current.quaternion.slerp(targetQuat, 0.2)
         }
     })
 
