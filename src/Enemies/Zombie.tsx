@@ -214,31 +214,43 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         pathfinderRef.current = pf
     }, [navMeshGeometry])
 
+    const projectToNavmesh = (pf: any, pos: THREE.Vector3) => {
+        // Rapprocher Y vers 0 (navmesh est à plat)
+        const flatPos = pos.clone(); flatPos.y = 0
+        let group = pf.getGroup(NAV_ZONE_ID, flatPos)
+        if (group === null || group === undefined) {
+            const nearNode = pf.getClosestNode(flatPos, NAV_ZONE_ID, 0, false)
+            group = nearNode ? pf.getGroup(NAV_ZONE_ID, nearNode.centroid) : 0
+        }
+        const node = pf.getClosestNode(flatPos, NAV_ZONE_ID, group, false)
+        if (!node) return null
+        const pt = new THREE.Vector3(node.centroid.x, node.centroid.y, node.centroid.z)
+        return { point: pt, group }
+    }
+
     const replanPath = (start: THREE.Vector3, target: THREE.Vector3) => {
         const pf = pathfinderRef.current
         if (!pf) return false
-        // Trouver un groupe valide même si le point est légèrement hors navmesh
-        let group = pf.getGroup(NAV_ZONE_ID, start)
-        if (group === null || group === undefined) {
-            const anyGroup = pf.getGroup(NAV_ZONE_ID, pf.getRandomNode(NAV_ZONE_ID, 0, start, 5) || start)
-            group = anyGroup ?? 0
+
+        const startInfo = projectToNavmesh(pf, start)
+        const targetInfo = projectToNavmesh(pf, target)
+        if (!startInfo || !targetInfo) {
+            console.warn('[Zombie] navmesh projection failed, fallback to raycast')
+            return false
         }
 
-        // Projeter start/target sur le navmesh pour éviter un path nul
-        const closestStart = pf.getClosestNode(start, NAV_ZONE_ID, group, false)?.centroid || start
-        const closestTarget = pf.getClosestNode(target, NAV_ZONE_ID, group, false)?.centroid || target
-
-        const path = pf.findPath(closestStart, closestTarget, NAV_ZONE_ID, group) as THREE.Vector3[] | null
-        if (path && path.length > 0) {
-            pathRef.current = path
-            waypointIndexRef.current = 0
-            lastTargetRef.current = target.clone()
-            lastReplanRef.current = performance.now()
-            console.info('[Zombie] navmesh active', navMeshPath, 'len', path.length)
-            return true
+        const path = pf.findPath(startInfo.point, targetInfo.point, NAV_ZONE_ID, startInfo.group) as THREE.Vector3[] | null
+        if (!path || path.length === 0) {
+            console.warn('[Zombie] navmesh path failed, fallback to raycast')
+            return false
         }
-        console.warn('[Zombie] navmesh path failed, fallback to raycast')
-        return false
+
+        pathRef.current = path
+        waypointIndexRef.current = 0
+        lastTargetRef.current = target.clone()
+        lastReplanRef.current = performance.now()
+        console.info('[Zombie] navmesh active', navMeshPath, 'len', path.length)
+        return true
     }
 
     // Calcul direction avec évitement local + slide
