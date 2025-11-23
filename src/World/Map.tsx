@@ -11,6 +11,7 @@ import { Door } from './Door'
 const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) => {
     const { scene } = useGLTF(modelPath)
     const setMapLoaded = useGameStore((state) => state.setMapLoaded)
+    const isHouseMap = modelPath.toLowerCase().includes('house_map')
 
     // Signal map readiness
     useEffect(() => {
@@ -57,9 +58,10 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
                     }
                 })
 
+                // For the House map, keep all meshes in the solid collider to avoid holes.
+                if (isHouseMap) return
+
                 const name = child.name.toLowerCase()
-
-
 
                 const isPlantOrTree = name.includes('grass') || name.includes('flower') || name.includes('plant') || name.includes('leaf') || name.includes('vegetation') || name.includes('tree') || name.includes('pine') || name.includes('spruce')
                 const isRock = name.includes('rock') || name.includes('stone') || name.includes('cliff') || name.includes('boulder') || name.includes('mountain') || name.includes('ice') || name.includes('log') || name.includes('stump')
