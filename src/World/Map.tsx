@@ -68,18 +68,6 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
                 // Detect doors and detach them so we can animate them independently
                 const isDoor = name.includes('door')
                 if (isDoor) {
-                    const worldPos = new THREE.Vector3()
-                    const worldQuat = new THREE.Quaternion()
-                    const worldScale = new THREE.Vector3()
-                    child.getWorldPosition(worldPos)
-                    child.getWorldQuaternion(worldQuat)
-                    child.getWorldScale(worldScale)
-
-                    if (child.parent) child.parent.remove(child)
-                    child.position.copy(worldPos)
-                    child.quaternion.copy(worldQuat)
-                    child.scale.copy(worldScale)
-
                     doorsToMove.push(child)
                     return
                 }
@@ -115,9 +103,21 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
             child.scale.copy(worldScale)
         })
 
-        // Collect doors (they already carry world transforms)
+        // Collect doors (compute world transform, then detach)
         doorsToMove.forEach(child => {
+            const worldPos = new THREE.Vector3()
+            const worldQuat = new THREE.Quaternion()
+            const worldScale = new THREE.Vector3()
+
+            child.getWorldPosition(worldPos)
+            child.getWorldQuaternion(worldQuat)
+            child.getWorldScale(worldScale)
+
             if (child.parent) child.parent.remove(child)
+            child.position.copy(worldPos)
+            child.quaternion.copy(worldQuat)
+            child.scale.copy(worldScale)
+
             doorObjects.push(child)
         })
 
