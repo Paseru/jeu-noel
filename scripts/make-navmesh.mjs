@@ -71,7 +71,7 @@ async function build({ input, output, keep, drop }) {
     const outPositions = []
     const outIndices = []
     let vIndex = 0
-    const margin = 0.35 // extra clearance around obstacles
+    const margin = 0.6 // extra clearance around obstacles (wider to éviter poteaux)
 
     const isInsideObstacle = (p) => {
         for (const b of obstacleBounds) {

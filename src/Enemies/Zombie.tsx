@@ -55,6 +55,8 @@ export function Zombie({ spawnPoint }: ZombieProps) {
     const lockIdRef = useRef<string>(`zombie-lock-${Math.random().toString(36).slice(2)}`)
     const lastWpDistRef = useRef<number | null>(null)
     const noImproveCounterRef = useRef<number>(0)
+    const stuckTimeRef = useRef<number>(0)
+    const lastUpdateMsRef = useRef<number | null>(null)
 
     // Helper to find actions by partial name (case insensitive)
     const findAction = (name: string) => {
@@ -209,6 +211,19 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         pathfinderRef.current = pf
     }, [navMeshGeometry])
 
+    const projectToNavmesh = (pf: any, pos: THREE.Vector3) => {
+        const flat = pos.clone(); flat.y = 0
+        let group = pf.getGroup(NAV_ZONE_ID, flat)
+        if (group === null || group === undefined) {
+            const nearNode = pf.getClosestNode(flat, NAV_ZONE_ID, 0, false)
+            group = nearNode ? pf.getGroup(NAV_ZONE_ID, nearNode.centroid) : 0
+        }
+        const node = pf.getClosestNode(flat, NAV_ZONE_ID, group, false)
+        if (!node) return null
+        const pt = new THREE.Vector3(node.centroid.x, node.centroid.y, node.centroid.z)
+        return { point: pt, group }
+    }
+
     const replanPath = (start: THREE.Vector3, target: THREE.Vector3) => {
         const pf = pathfinderRef.current
         if (!pf) return false
@@ -330,6 +345,10 @@ export function Zombie({ spawnPoint }: ZombieProps) {
     useFrame(() => {
         const body = bodyRef.current
         if (!body) return
+
+        const nowMs = performance.now()
+        const dt = lastUpdateMsRef.current ? (nowMs - lastUpdateMsRef.current) / 1000 : 1 / 60
+        lastUpdateMsRef.current = nowMs
 
         // Current position
         const pos = body.translation()
@@ -538,23 +557,47 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         }
         lastPosRef.current = currentPosVector.clone()
 
-        // Évitement local + slide sur normale
-        desiredDir = steerWithAvoidance(desiredDir, pos, world, body.handle)
+        // Détection de stagnation (vitesse quasi nulle)
+        const linvel = body.linvel()
+        const speed = Math.hypot(linvel.x, linvel.z)
+        if (speed < 0.1) stuckTimeRef.current += dt
+        else stuckTimeRef.current = 0
 
-        const hasDir = desiredDir.lengthSq() > 0.0001
+        // Stratégie anti-stuck : pas de côté puis recul avant téléport filet
+        let moveCandidate = desiredDir.clone()
+        if (stuckTimeRef.current > 0.6 && stuckTimeRef.current < 1.5) {
+            const side = Math.random() > 0.5 ? Math.PI / 2 : -Math.PI / 2
+            moveCandidate = desiredDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), side)
+        } else if (stuckTimeRef.current >= 1.5 && stuckTimeRef.current < 2.0) {
+            moveCandidate = desiredDir.clone().negate()
+        }
+
+        // Évitement local + slide sur normale
+        const moveDir = steerWithAvoidance(moveCandidate, pos, world, body.handle)
+
+        const hasDir = moveDir.lengthSq() > 0.0001
 
         // Apply velocity
         body.setLinvel({
-            x: hasDir ? desiredDir.x * RUN_SPEED : 0,
+            x: hasDir ? moveDir.x * RUN_SPEED : 0,
             y: body.linvel().y,
-            z: hasDir ? desiredDir.z * RUN_SPEED : 0
+            z: hasDir ? moveDir.z * RUN_SPEED : 0
         }, true)
 
         // Rotate visual model toward movement direction
         if (modelRef.current && hasDir) {
             const targetQuat = new THREE.Quaternion()
-            targetQuat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(desiredDir.x, desiredDir.z))
+            targetQuat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(moveDir.x, moveDir.z))
             modelRef.current.quaternion.slerp(targetQuat, 0.2)
+        }
+
+        // Filet de sécurité : téléport sur le navmesh le plus proche si bloqué > 2s
+        if (stuckTimeRef.current >= 2.0 && pathfinderRef.current) {
+            const proj = projectToNavmesh(pathfinderRef.current, currentPosVector)
+            if (proj) {
+                body.setTranslation({ x: proj.point.x, y: pos.y, z: proj.point.z }, true)
+                stuckTimeRef.current = 0
+            }
         }
     })
 
