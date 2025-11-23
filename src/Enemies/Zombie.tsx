@@ -5,17 +5,14 @@ import { CapsuleCollider, RigidBody, RapierRigidBody, useRapier } from '@react-t
 import { Group } from 'three'
 import * as THREE from 'three'
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-// @ts-ignore three-pathfinding n'a pas de typings TS
-import { Pathfinding } from 'three-pathfinding'
+import * as YUKA from 'yuka'
 import { useGameStore } from '../stores/useGameStore'
 import { useVoiceStore } from '../stores/useVoiceStore'
 import { AudioLoader, PositionalAudio } from 'three'
 
 const RUN_SPEED = 5
 const ATTACK_RANGE = 1.0
-const NAVMESH_PATH = '/navmesh/navmesh.glb'
-const NAV_ZONE_ID = 'level'
+const NAVMESH_PATH = '/navmesh/navmesh_snowy_village.glb'
 
 type ZombieState = 'idle' | 'run' | 'attack'
 
@@ -44,8 +41,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
     const agonyBufferRef = useRef<AudioBuffer | null>(null)
     const wasCloseRef = useRef<boolean>(false)
     const [navMeshPath, setNavMeshPath] = useState<string>(NAVMESH_PATH)
-    const [navMeshGeometry, setNavMeshGeometry] = useState<THREE.BufferGeometry | null>(null)
-    const pathfinderRef = useRef<any | null>(null)
+    const yukaNavMeshRef = useRef<YUKA.NavMesh | null>(null)
     const pathRef = useRef<THREE.Vector3[]>([])
     const waypointIndexRef = useRef<number>(0)
     const lastTargetRef = useRef<THREE.Vector3 | null>(null)
@@ -165,88 +161,54 @@ export function Zombie({ spawnPoint }: ZombieProps) {
 
         let path = NAVMESH_PATH
         if (model.includes('taco')) path = '/navmesh/navmesh_tacos.glb'
-        else if (model.includes('snow')) path = '/navmesh/navmesh.glb'
+        else if (model.includes('snow')) path = NAVMESH_PATH
         else if (model) {
             const base = model.split('/').pop()?.replace(/\.(gltf|glb)$/i, '') || 'navmesh'
             path = `/navmesh/${base}.glb`
         }
 
         setNavMeshPath(path)
-        setNavMeshGeometry(null)
-        pathfinderRef.current = null
+        yukaNavMeshRef.current = null
+        pathRef.current = []
+        waypointIndexRef.current = 0
     }, [currentRoomId, rooms])
 
-    // Navmesh loading (silencieux si le fichier est absent)
+    // Charger le navmesh Yuka (silencieux si le fichier est absent)
     useEffect(() => {
         let cancelled = false
         if (!navMeshPath) return
-        const loader = new GLTFLoader()
-        loader.load(
-            navMeshPath,
-            (gltf) => {
-                if (cancelled) return
-                const mesh = gltf.scene.getObjectByProperty('type', 'Mesh') as THREE.Mesh | null
-                if (mesh?.geometry) {
-                    setNavMeshGeometry(mesh.geometry.clone())
-                } else {
-                    console.warn('[Zombie] navmesh loaded but no mesh found in glb')
-                }
-            },
-            undefined,
-            (err: any) => {
-                console.warn('[Zombie] navmesh not found, fallback to raycast avoidance', err)
-            }
-        )
+        const loader = new YUKA.NavMeshLoader()
+        loader.load(navMeshPath).then(navMesh => {
+            if (cancelled) return
+            yukaNavMeshRef.current = navMesh
+            console.info('[Zombie] yuka navmesh loaded', navMeshPath)
+        }).catch((err: any) => {
+            console.warn('[Zombie] navmesh not found, fallback to raycast avoidance', err)
+        })
         return () => {
             cancelled = true
         }
     }, [navMeshPath])
 
-    // Construire le pathfinder une fois le navmesh chargé
-    useEffect(() => {
-        if (!navMeshGeometry) return
-        const pf = new Pathfinding()
-        const zone = Pathfinding.createZone(navMeshGeometry)
-        pf.setZoneData(NAV_ZONE_ID, zone)
-        pathfinderRef.current = pf
-    }, [navMeshGeometry])
-
-    const projectToNavmesh = (pf: any, pos: THREE.Vector3) => {
-        const flat = pos.clone(); flat.y = 0
-        let group = pf.getGroup(NAV_ZONE_ID, flat)
-        if (group === null || group === undefined) {
-            const nearNode = pf.getClosestNode(flat, NAV_ZONE_ID, 0, false)
-            group = nearNode ? pf.getGroup(NAV_ZONE_ID, nearNode.centroid) : 0
-        }
-        const node = pf.getClosestNode(flat, NAV_ZONE_ID, group, false)
-        if (!node) return null
-        const pt = new THREE.Vector3(node.centroid.x, node.centroid.y, node.centroid.z)
-        return { point: pt, group }
-    }
-
     const replanPath = (start: THREE.Vector3, target: THREE.Vector3) => {
-        const pf = pathfinderRef.current
-        if (!pf) return false
-        // Trouver un groupe valide même si le point est légèrement hors navmesh
-        let group = pf.getGroup(NAV_ZONE_ID, start)
-        if (group === null || group === undefined) {
-            const anyGroup = pf.getGroup(NAV_ZONE_ID, pf.getRandomNode(NAV_ZONE_ID, 0, start, 5) || start)
-            group = anyGroup ?? 0
-        }
+        const nav = yukaNavMeshRef.current
+        if (!nav) return false
 
-        // Projeter start/target sur le navmesh pour éviter un path nul
-        const closestStart = pf.getClosestNode(start, NAV_ZONE_ID, group, false)?.centroid || start
-        const closestTarget = pf.getClosestNode(target, NAV_ZONE_ID, group, false)?.centroid || target
+        const from = new YUKA.Vector3(start.x, start.y, start.z)
+        const to = new YUKA.Vector3(target.x, target.y, target.z)
+        const fromRegion = nav.getClosestRegion(from)
+        const toRegion = nav.getClosestRegion(to)
+        const path = nav.findPath(fromRegion ? fromRegion.centroid : from, toRegion ? toRegion.centroid : to)
 
-        const path = pf.findPath(closestStart, closestTarget, NAV_ZONE_ID, group) as THREE.Vector3[] | null
         if (path && path.length > 0) {
-            pathRef.current = path
+            pathRef.current = path.map(p => new THREE.Vector3(p.x, p.y, p.z))
             waypointIndexRef.current = 0
             lastTargetRef.current = target.clone()
             lastReplanRef.current = performance.now()
-            console.info('[Zombie] navmesh active', navMeshPath, 'len', path.length)
+            console.info('[Zombie] yuka path len', path.length)
             return true
         }
+
         console.warn('[Zombie] navmesh path failed, fallback to raycast')
         return false
     }
@@ -505,7 +467,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         const targetMoved = lastTargetRef.current ? lastTargetRef.current.distanceTo(targetVec3) > 1 : true
         const pathEmpty = pathRef.current.length === 0 || waypointIndexRef.current >= pathRef.current.length
         const replanCooldown = now - lastReplanRef.current > 1500
-        if (pathfinderRef.current && (targetMoved || pathEmpty || replanCooldown)) {
+        if (yukaNavMeshRef.current && (targetMoved || pathEmpty || replanCooldown)) {
             replanPath(currentPosVector, targetVec3)
         }
 
@@ -591,14 +553,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
             modelRef.current.quaternion.slerp(targetQuat, 0.2)
         }
 
-        // Filet de sécurité : téléport sur le navmesh le plus proche si bloqué > 2s
-        if (stuckTimeRef.current >= 2.0 && pathfinderRef.current) {
-            const proj = projectToNavmesh(pathfinderRef.current, currentPosVector)
-            if (proj) {
-                body.setTranslation({ x: proj.point.x, y: pos.y, z: proj.point.z }, true)
-                stuckTimeRef.current = 0
-            }
-        }
+        // Filet de sécurité désactivé (Yuka clamp possible, mais on reste soft pour éviter les sauts visibles)
     })
 
     return (
