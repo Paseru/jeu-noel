@@ -40,7 +40,7 @@ const ROOMS = [
         navMeshPath: "/models/farm_map_navmesh.glb",
         maxPlayers: 40,
         spawnPoint: [6.74, 4.5, -1.4],
-        zombieSpawnPoint: [-80, 4.0, -80],
+        zombieSpawnPoint: [35.91, 15.6, 71.48],
         summonPoint: [6.74, 2.5, -1.4]
     }
 ];
