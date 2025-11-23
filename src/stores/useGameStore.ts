@@ -78,6 +78,8 @@ interface GameState {
     cameraForceSources: string[]
     forceCameraMode: (mode: 'FIRST' | 'THIRD', source: string) => void
     releaseCameraMode: (source: string) => void
+    killCamTarget: [number, number, number] | null
+    setKillCamTarget: (target: [number, number, number] | null) => void
     mapLoaded: boolean
     setMapLoaded: (loaded: boolean) => void
     messages: ChatMessage[]
@@ -170,7 +172,8 @@ export const useGameStore = create<GameState>((set, get) => ({
             if (playerId && players[playerId]) {
                 players[playerId] = { ...players[playerId], isDead: dead }
             }
-            return { isPlayerDead: dead, players }
+            const baseState = { isPlayerDead: dead, players }
+            return dead ? baseState : { ...baseState, killCamTarget: null }
         })
     },
     movementLocked: false,
@@ -200,6 +203,8 @@ export const useGameStore = create<GameState>((set, get) => ({
             forcedCameraMode: cameraForceSources.length > 0 ? state.forcedCameraMode : null
         }
     }),
+    killCamTarget: null,
+    setKillCamTarget: (target) => set({ killCamTarget: target }),
     mapLoaded: false,
     setMapLoaded: (loaded) => set({ mapLoaded: loaded }),
     messages: [],
@@ -409,7 +414,8 @@ export const useGameStore = create<GameState>((set, get) => ({
                 mapLoaded: false,
                 zombies: [],
                 roundActive: false,
-                gather: createInitialGatherState()
+                gather: createInitialGatherState(),
+                killCamTarget: null
             })
         }
     },
@@ -434,7 +440,8 @@ export const useGameStore = create<GameState>((set, get) => ({
             movementLocked: false,
             movementLockSources: [],
             cameraForceSources: [],
-            forcedCameraMode: null
+            forcedCameraMode: null,
+            killCamTarget: null
         })
     },
 

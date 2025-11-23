@@ -55,6 +55,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
     const lockIdRef = useRef<string>(`zombie-lock-${Math.random().toString(36).slice(2)}`)
     const lastWpDistRef = useRef<number | null>(null)
     const noImproveCounterRef = useRef<number>(0)
+    const killCamTargetRef = useRef<THREE.Vector3 | null>(null)
 
     // Helper to find actions by partial name (case insensitive)
     const findAction = (name: string) => {
@@ -152,6 +153,10 @@ export function Zombie({ spawnPoint }: ZombieProps) {
             if (wasCloseRef.current) {
                 useGameStore.getState().unlockMovement(lockIdRef.current)
                 useGameStore.getState().releaseCameraMode(lockIdRef.current)
+            }
+            if (killCamTargetRef.current) {
+                killCamTargetRef.current = null
+                useGameStore.getState().setKillCamTarget(null)
             }
         }
     }, [])
@@ -342,6 +347,8 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         const unlockMovement = useGameStore.getState().unlockMovement
         const forceCameraMode = useGameStore.getState().forceCameraMode
         const releaseCameraMode = useGameStore.getState().releaseCameraMode
+        const setKillCamTarget = useGameStore.getState().setKillCamTarget
+        const isPlayerDead = useGameStore.getState().isPlayerDead
         const sfxVolume = useGameStore.getState().volumes.sfx
         let nearest: { id: string, position: [number, number, number] } | null = null
         let minDist = Infinity
@@ -363,6 +370,10 @@ export function Zombie({ spawnPoint }: ZombieProps) {
             if (wasCloseRef.current) {
                 unlockMovement(lockIdRef.current)
                 releaseCameraMode(lockIdRef.current)
+                if (!isPlayerDead && killCamTargetRef.current) {
+                    killCamTargetRef.current = null
+                    setKillCamTarget(null)
+                }
                 wasCloseRef.current = false
             }
             playState('idle')
@@ -381,10 +392,18 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         const isLocalTarget = nearestTarget.id === localId
         const withinAttackRange = flatLen < ATTACK_RANGE
 
-        // Lock local player controls & force 3rd person when grabbed
+        // Lock local player controls & force first-person when grabbed
         if (isLocalTarget && withinAttackRange) {
             lockMovement(lockIdRef.current)
-            forceCameraMode('THIRD', lockIdRef.current)
+            forceCameraMode('FIRST', lockIdRef.current)
+
+            // Keep a live target for the killcam to aim the player's view at the attacker's face
+            const headTarget = new THREE.Vector3(pos.x, pos.y + 0.9, pos.z)
+            const lastTarget = killCamTargetRef.current
+            if (!lastTarget || lastTarget.distanceTo(headTarget) > 0.05) {
+                killCamTargetRef.current = headTarget.clone()
+                setKillCamTarget([headTarget.x, headTarget.y, headTarget.z])
+            }
 
             // Play agony sound once when entering the grab range
             if (!wasCloseRef.current) {
@@ -410,6 +429,10 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         } else if (wasCloseRef.current) {
             unlockMovement(lockIdRef.current)
             releaseCameraMode(lockIdRef.current)
+            if (!isPlayerDead && killCamTargetRef.current) {
+                killCamTargetRef.current = null
+                setKillCamTarget(null)
+            }
             wasCloseRef.current = false
         }
 

@@ -179,6 +179,12 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             ? { forward: false, backward: false, left: false, right: false, jump: false, run: false }
             : keys
 
+        // When a killcam target is present (zombie grabbed you), we force first-person view
+        const killCamTarget = useGameStore.getState().killCamTarget
+        if (killCamTarget && cameraMode !== 'FIRST') {
+            setCameraMode('FIRST')
+        }
+
         const { joystick, lookDelta, isJumping, isRunning: isMobileRunning } = mobileInput
 
         // Combine keyboard and mobile inputs
@@ -322,6 +328,20 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             )
 
             camera.position.lerp(targetPos, 0.2)
+        }
+
+        // Force the view to look at the attacker when grabbed/finishing blow happens
+        if (killCamTarget) {
+            const eyePos = new THREE.Vector3(translation.x, translation.y + 1 + bobOffset, translation.z)
+            camera.position.copy(eyePos)
+
+            const targetVec = new THREE.Vector3(killCamTarget[0], killCamTarget[1], killCamTarget[2])
+            const toTarget = targetVec.clone().sub(eyePos)
+            if (toTarget.lengthSq() > 1e-6) {
+                camera.rotation.order = 'YXZ'
+                camera.lookAt(targetVec)
+                camera.rotation.z = 0
+            }
         }
 
         // Character Rotation (Face movement direction)

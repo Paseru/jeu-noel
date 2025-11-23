@@ -28,6 +28,8 @@ export default function CharacterModel({
 }: CharacterModelProps) {
     const group = useRef<Group>(null)
     const phase = useGameStore((state) => state.phase)
+    const currentRoomId = useGameStore((state) => state.currentRoomId)
+    const isPlayerDead = useGameStore((state) => state.isPlayerDead)
     const { scene, animations } = useGLTF(`/models/characters/character_${characterIndex}.glb`)
 
     // Clone scene for multiple instances
@@ -118,18 +120,17 @@ export default function CharacterModel({
         return () => {
             // Keep current action; next effect run will replace if needed
         }
-    }, [isMoving, isRunning, actions, animations, characterIndex, phase])
+    }, [isMoving, isRunning, actions, animations, characterIndex, phase, currentRoomId])
 
-    // Safety: if mixer is idle (e.g., after respawn), kick idle once
+    // Safety: if mixer is idle (e.g., after respawn or room change), kick idle once
     useEffect(() => {
         if (!animations.length || !Object.keys(actions).length) return
         const idleAction = actions[animations[0]?.name] || actions[Object.keys(actions)[0]]
-        const anyRunning = Object.values(actions).some(a => a?.isRunning && a.isRunning())
-        if (!anyRunning && idleAction) {
+        if (idleAction) {
             Object.values(actions).forEach(a => a?.stop())
-            idleAction.reset().fadeIn(0.15).play()
+            idleAction.reset().fadeIn(0.12).play()
         }
-    }, [animations, actions, phase])
+    }, [animations, actions, phase, currentRoomId, isPlayerDead])
 
     // Nameplate Visibility Logic
     const [isNameplateVisible, setIsNameplateVisible] = useState(true)
