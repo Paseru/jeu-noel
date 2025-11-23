@@ -42,6 +42,18 @@ const ROOMS = [
         spawnPoint: [6.74, 4.5, -1.4],
         zombieSpawnPoint: [35.91, 15.6, 71.48],
         summonPoint: [6.74, 2.5, -1.4]
+    },
+    {
+        id: "server-house",
+        name: "House",
+        mapImage: "/maps/House.jpeg",
+        modelPath: "/models/House_map.glb",
+        navMeshPath: "/models/House_map_navmesh.glb",
+        maxPlayers: 40,
+        // Points sampled from the navmesh so they sit on walkable ground
+        spawnPoint: [8.78, 1.0, -3.45],
+        zombieSpawnPoint: [-121.22, 1.0, 35.35],
+        summonPoint: [-37.42, 1.0, 6.75]
     }
 ];
 
