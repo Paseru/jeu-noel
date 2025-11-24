@@ -34,7 +34,9 @@ export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
                         <meshStandardMaterial color="red" wireframe />
                     </mesh>
                 }>
-                    <Map />
+                    <Suspense fallback={null}>
+                        <Map />
+                    </Suspense>
                 </ErrorBoundary>
 
                 <ZombieSummonZone />
