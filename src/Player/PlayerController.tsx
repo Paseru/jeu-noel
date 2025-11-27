@@ -11,7 +11,6 @@ const SPEED = 3.2
 const RUN_SPEED = 6
 const JUMP_FORCE = 8
 const FLY_SPEED = 15
-const PLAYER_HEIGHT = 1.8
 const GRAVITY = 20
 
 import CharacterModel from './CharacterModel'
@@ -412,42 +411,58 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
         if (!flyMode && colliderMesh) {
             const pos = body.current.translation()
             
-            // Raycast down from player position
+            // Raycast down from above player head to find ground
             raycaster.set(
-                new THREE.Vector3(pos.x, pos.y + 1, pos.z),
+                new THREE.Vector3(pos.x, pos.y + 10, pos.z),
                 new THREE.Vector3(0, -1, 0)
             )
+            raycaster.far = 100
             
             const hits = raycaster.intersectObject(colliderMesh, false)
             
             if (hits.length > 0) {
                 const groundY = hits[0].point.y
-                const playerFeetY = pos.y
-                const distanceToGround = playerFeetY - groundY
+                const distanceToGround = pos.y - groundY
                 
-                // Check if grounded (within threshold)
-                if (distanceToGround <= 0.15 && velocityY.current <= 0) {
-                    isGrounded.current = true
-                    velocityY.current = 0
-                    // Snap to ground
-                    body.current.setTranslation({ x: pos.x, y: groundY + 0.05, z: pos.z }, true)
-                } else if (distanceToGround < PLAYER_HEIGHT && velocityY.current <= 0) {
-                    // Approaching ground - snap
-                    isGrounded.current = true
-                    velocityY.current = 0
-                    body.current.setTranslation({ x: pos.x, y: groundY + 0.05, z: pos.z }, true)
+                // Falling or on ground
+                if (velocityY.current <= 0) {
+                    if (distanceToGround <= 0.2) {
+                        // On ground - snap
+                        isGrounded.current = true
+                        velocityY.current = 0
+                        body.current.setTranslation({ x: pos.x, y: groundY + 0.1, z: pos.z }, true)
+                    } else if (distanceToGround < 2) {
+                        // Close to ground - apply gravity and check
+                        isGrounded.current = false
+                        velocityY.current -= GRAVITY * delta
+                        const newY = pos.y + velocityY.current * delta
+                        if (newY <= groundY + 0.1) {
+                            // Would go through ground - snap
+                            body.current.setTranslation({ x: pos.x, y: groundY + 0.1, z: pos.z }, true)
+                            velocityY.current = 0
+                            isGrounded.current = true
+                        } else {
+                            body.current.setTranslation({ x: pos.x, y: newY, z: pos.z }, true)
+                        }
+                    } else {
+                        // Far from ground - fall
+                        isGrounded.current = false
+                        velocityY.current -= GRAVITY * delta
+                        velocityY.current = Math.max(velocityY.current, -50) // Terminal velocity
+                        body.current.setTranslation({ x: pos.x, y: pos.y + velocityY.current * delta, z: pos.z }, true)
+                    }
                 } else {
+                    // Rising (jumping)
                     isGrounded.current = false
+                    velocityY.current -= GRAVITY * delta
+                    body.current.setTranslation({ x: pos.x, y: pos.y + velocityY.current * delta, z: pos.z }, true)
                 }
             } else {
+                // No ground found - fall
                 isGrounded.current = false
-            }
-            
-            // Apply gravity if not grounded
-            if (!isGrounded.current) {
                 velocityY.current -= GRAVITY * delta
-                const newY = pos.y + velocityY.current * delta
-                body.current.setTranslation({ x: pos.x, y: newY, z: pos.z }, true)
+                velocityY.current = Math.max(velocityY.current, -50)
+                body.current.setTranslation({ x: pos.x, y: pos.y + velocityY.current * delta, z: pos.z }, true)
             }
             
             // Jump Logic

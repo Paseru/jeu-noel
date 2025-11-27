@@ -111,51 +111,58 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
     useEffect(() => {
         if (!solidScene) return
 
-        const geometries: THREE.BufferGeometry[] = []
-        const tempMatrix = new THREE.Matrix4()
+        // Small delay to ensure scene is fully loaded
+        const timer = setTimeout(() => {
+            const geometries: THREE.BufferGeometry[] = []
+            const tempMatrix = new THREE.Matrix4()
+            const scaleMatrix = new THREE.Matrix4().makeScale(scale, scale, scale)
 
-        solidScene.updateMatrixWorld(true)
+            solidScene.updateMatrixWorld(true)
 
-        solidScene.traverse((child) => {
-            if (child instanceof THREE.Mesh && child.geometry) {
-                const clonedGeo = child.geometry.clone()
-                // Apply world transform including scale
-                tempMatrix.copy(child.matrixWorld)
-                tempMatrix.scale(new THREE.Vector3(scale, scale, scale))
-                clonedGeo.applyMatrix4(tempMatrix)
-                geometries.push(clonedGeo)
-            }
-        })
+            solidScene.traverse((child) => {
+                if (child instanceof THREE.Mesh && child.geometry) {
+                    const clonedGeo = child.geometry.clone()
+                    // Apply world transform then scale
+                    tempMatrix.copy(child.matrixWorld).multiply(scaleMatrix)
+                    clonedGeo.applyMatrix4(tempMatrix)
+                    geometries.push(clonedGeo)
+                }
+            })
 
-        if (geometries.length === 0) {
-            console.warn('[Map] No geometries found for BVH')
-            return
-        }
-
-        console.log(`[Map] Merging ${geometries.length} geometries for BVH...`)
-
-        try {
-            const mergedGeometry = mergeGeometries(geometries, false)
-            if (!mergedGeometry) {
-                console.warn('[Map] Failed to merge geometries')
+            if (geometries.length === 0) {
+                console.warn('[Map] No geometries found for BVH')
                 return
             }
 
-            // Build BVH
-            console.log('[Map] Building BVH...')
-            const bvh = new MeshBVH(mergedGeometry)
-            mergedGeometry.boundsTree = bvh
+            console.log(`[Map] Merging ${geometries.length} geometries for BVH...`)
 
-            const colliderMesh = new THREE.Mesh(mergedGeometry)
-            colliderMesh.visible = false
-            
-            setColliderMesh(colliderMesh)
-            console.log('[Map] BVH collider ready!')
-        } catch (err) {
-            console.error('[Map] BVH build failed:', err)
-        }
+            try {
+                const mergedGeometry = mergeGeometries(geometries, false)
+                if (!mergedGeometry) {
+                    console.warn('[Map] Failed to merge geometries')
+                    return
+                }
+
+                // Build BVH
+                console.log('[Map] Building BVH...')
+                const bvh = new MeshBVH(mergedGeometry)
+                mergedGeometry.boundsTree = bvh
+
+                const colliderMesh = new THREE.Mesh(
+                    mergedGeometry,
+                    new THREE.MeshBasicMaterial({ visible: false })
+                )
+                colliderMesh.name = 'BVH_Collider'
+                
+                setColliderMesh(colliderMesh)
+                console.log('[Map] BVH collider ready!')
+            } catch (err) {
+                console.error('[Map] BVH build failed:', err)
+            }
+        }, 100)
 
         return () => {
+            clearTimeout(timer)
             setColliderMesh(null)
         }
     }, [solidScene, scale, setColliderMesh])
