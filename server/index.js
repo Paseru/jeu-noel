@@ -11,61 +11,6 @@ const io = new Server(PORT, {
 // Define available rooms (servers)
 const ROOMS = [
     {
-        id: "server-1",
-        name: "Snowy Village",
-        mapImage: "/maps/Snowy Village.jpg",
-        modelPath: "/models/snowy_village_ps1_environment.glb",
-        navMeshPath: "/navmesh/navmesh_snowy_village.glb",
-        maxPlayers: 40,
-        spawnPoint: [1.98, 9.55, -11.47],
-        zombieSpawnPoint: [47.74, 13.03, -140.37],
-        summonPoint: [-4.13, 0.80, -25.91]
-    },
-    {
-        id: "server-tacos",
-        name: "Tacos World",
-        mapImage: "/maps/Tacos.jpg",
-        modelPath: "/models/tacos (1).glb",
-        navMeshPath: "/navmesh/navmesh_tacos.glb",
-        maxPlayers: 40,
-        spawnPoint: [-0.13, 2.06, 16.38],
-        zombieSpawnPoint: [15.09, 3.23, -10.32],
-        summonPoint: [12.30, 0.66, 9.29]
-    },
-    {
-        id: "server-farm",
-        name: "Farm",
-        mapImage: "/maps/Farm.jpg",
-        modelPath: "/models/farm_map.glb",
-        navMeshPath: "/models/farm_map_navmesh.glb",
-        maxPlayers: 40,
-        spawnPoint: [6.74, 4.5, -1.4],
-        zombieSpawnPoint: [35.91, 15.6, 71.48],
-        summonPoint: [6.74, 2.5, -1.4]
-    },
-    {
-        id: "server-house",
-        name: "House",
-        mapImage: "/maps/House.jpeg",
-        modelPath: "/models/House_map.glb",
-        navMeshPath: "/models/House_map_navmesh.glb",
-        maxPlayers: 40,
-        // Points sampled from the navmesh so they sit on walkable ground
-        spawnPoint: [8.78, 1.0, -3.45],
-        zombieSpawnPoint: [-121.22, 1.0, 35.35],
-        summonPoint: [-37.42, 1.0, 6.75]
-    },
-    {
-        id: "server-desert",
-        name: "Desert",
-        mapImage: "/maps/Desert.jpg",
-        modelPath: "/models/Desert.glb",
-        maxPlayers: 40,
-        spawnPoint: [0, 2, 0],
-        zombieSpawnPoint: [10, 2, 10],
-        summonPoint: [0, 2, 5]
-    },
-    {
         id: "server-subway",
         name: "Subway",
         mapImage: "/maps/sub.jpg",
