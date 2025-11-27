@@ -54,6 +54,16 @@ const ROOMS = [
         spawnPoint: [8.78, 1.0, -3.45],
         zombieSpawnPoint: [-121.22, 1.0, 35.35],
         summonPoint: [-37.42, 1.0, 6.75]
+    },
+    {
+        id: "server-desert",
+        name: "Desert",
+        mapImage: "/maps/Desert.jpg",
+        modelPath: "/models/Desert.glb",
+        maxPlayers: 40,
+        spawnPoint: [0, 2, 0],
+        zombieSpawnPoint: [10, 2, 10],
+        summonPoint: [0, 2, 5]
     }
 ];
 
