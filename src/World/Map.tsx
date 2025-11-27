@@ -6,8 +6,6 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { useGameStore } from '../stores/useGameStore'
 import { useCollisionStore } from '../stores/useCollisionStore'
 
-import { Door } from './Door'
-
 // Extend THREE.Mesh to use accelerated raycast
 THREE.Mesh.prototype.raycast = acceleratedRaycast
 
@@ -17,20 +15,18 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
     const setMapLoaded = useGameStore((state) => state.setMapLoaded)
     const setColliderMesh = useCollisionStore((state) => state.setColliderMesh)
 
-    // Extract plants and DOORS to separate groups
-    const { solidScene, plantScene, doors } = useMemo(() => {
+    // Extract plants to separate group
+    const { solidScene, plantScene } = useMemo(() => {
         try {
             if (!scene || typeof (scene as any).traverse !== 'function') {
-                return { solidScene: new THREE.Scene(), plantScene: new THREE.Scene(), doors: [] as THREE.Object3D[] }
+                return { solidScene: new THREE.Scene(), plantScene: new THREE.Scene() }
             }
             const clonedScene = scene.clone()
 
             const plants = new THREE.Scene()
             const solids = clonedScene
-            const doorObjects: THREE.Object3D[] = []
 
             const plantsToMove: THREE.Object3D[] = []
-            const doorsToMove: THREE.Object3D[] = []
 
             clonedScene.traverse((child) => {
                 if (child instanceof THREE.Mesh) {
@@ -52,12 +48,6 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
                     })
 
                     const name = child.name.toLowerCase()
-
-                    const isDoor = name.includes('door')
-                    if (isDoor) {
-                        doorsToMove.push(child)
-                        return
-                    }
 
                     const isPlantOrTree = name.includes('grass') || name.includes('flower') || name.includes('plant') || name.includes('leaf') || name.includes('vegetation') || name.includes('tree') || name.includes('pine') || name.includes('spruce')
                     const isRock = name.includes('rock') || name.includes('stone') || name.includes('cliff') || name.includes('boulder') || name.includes('mountain') || name.includes('ice') || name.includes('log') || name.includes('stump')
@@ -86,24 +76,10 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
                 child.scale.copy(worldScale)
             })
 
-            doorsToMove.forEach(child => {
-                const worldPos = new THREE.Vector3()
-                const worldQuat = new THREE.Quaternion()
-                const worldScale = new THREE.Vector3()
-                child.getWorldPosition(worldPos)
-                child.getWorldQuaternion(worldQuat)
-                child.getWorldScale(worldScale)
-                if (child.parent) child.parent.remove(child)
-                child.position.copy(worldPos)
-                child.quaternion.copy(worldQuat)
-                child.scale.copy(worldScale)
-                doorObjects.push(child)
-            })
-
-            return { solidScene: solids, plantScene: plants, doors: doorObjects }
+            return { solidScene: solids, plantScene: plants }
         } catch (err) {
             console.warn('[Map] failed to process scene', err)
-            return { solidScene: new THREE.Scene(), plantScene: new THREE.Scene(), doors: [] as THREE.Object3D[] }
+            return { solidScene: new THREE.Scene(), plantScene: new THREE.Scene() }
         }
     }, [scene, modelPath])
 
@@ -180,13 +156,6 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
 
             {/* Plants (Decoration) */}
             <primitive object={plantScene} scale={scale} />
-
-            {/* Interactive Doors */}
-            {doors.map((door, index) => (
-                <group key={index} scale={scale}>
-                    <Door object={door} />
-                </group>
-            ))}
         </>
     )
 }
