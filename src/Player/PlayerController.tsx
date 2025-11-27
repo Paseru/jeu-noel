@@ -1,18 +1,25 @@
 import * as THREE from 'three'
 import { useGameStore } from '../stores/useGameStore'
 import { useVoiceStore } from '../stores/useVoiceStore'
+import { useCollisionStore } from '../stores/useCollisionStore'
 import { useRef, useEffect, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useKeyboardControls, PointerLockControls } from '@react-three/drei'
-import { CapsuleCollider, RigidBody, RapierRigidBody, useRapier } from '@react-three/rapier'
+import { CapsuleCollider, RigidBody, RapierRigidBody } from '@react-three/rapier'
 
 const SPEED = 3.2
 const RUN_SPEED = 6
-const JUMP_FORCE = 6
-const FLY_SPEED = 15 // Faster speed for flying
+const JUMP_FORCE = 8
+const FLY_SPEED = 15
+const PLAYER_HEIGHT = 1.8
+const GRAVITY = 20
 
 import CharacterModel from './CharacterModel'
 import { PositionalAudio as ThreePositionalAudio, AudioLoader } from 'three'
+
+// Reusable raycaster for ground detection
+const raycaster = new THREE.Raycaster()
+raycaster.firstHitOnly = true
 
 interface PlayerControllerProps {
     isSettingsOpen: boolean
@@ -23,10 +30,14 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     const body = useRef<RapierRigidBody>(null!)
     const [subscribeKeys, getKeys] = useKeyboardControls()
     const { camera, scene } = useThree()
-    const { rapier, world } = useRapier()
+    const colliderMesh = useCollisionStore((state) => state.colliderMesh)
 
     // Reference to the character mesh group for rotation
     const characterRef = useRef<THREE.Group>(null)
+    
+    // Custom gravity velocity
+    const velocityY = useRef(0)
+    const isGrounded = useRef(false)
 
     // Head bobbing state
     const bobState = useRef(0)
@@ -227,15 +238,17 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
 
         } else {
             // --- NORMAL WALKING LOGIC ---
-            body.current.setGravityScale(1, true)
+            // Disable Rapier gravity - we handle it with BVH
+            body.current.setGravityScale(0, true)
 
             direction
                 .subVectors(frontVector, sideVector)
                 .normalize()
                 .multiplyScalar(run ? RUN_SPEED : SPEED)
-                .applyEuler(camera.rotation) // Use camera for direction so it's responsive
+                .applyEuler(camera.rotation)
 
-            body.current.setLinvel({ x: direction.x, y: velocity.y, z: direction.z }, true)
+            // Only set horizontal velocity - Y is handled by BVH ground detection
+            body.current.setLinvel({ x: direction.x, y: 0, z: direction.z }, true)
         }
 
         // Apply Camera Rotation from Touch
@@ -395,20 +408,71 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             run
         )
 
-        // Jump Logic (Only when NOT flying)
-        if (jump && !flyMode) {
-            const now = Date.now()
-            if (now - lastJumpTime.current > 1000) { // 1 second cooldown
-                // Simple ground check: raycast down
-                const origin = body.current.translation()
-                origin.y -= 0.65 // Start slightly below center
-                const ray = new rapier.Ray(origin, { x: 0, y: -1, z: 0 })
-                const hit = world.castRay(ray, 0.5, true)
-
-                // Only jump if grounded AND not already moving up fast (prevents double jump / flying)
-                if (hit && hit.timeOfImpact < 0.2 && Math.abs(velocity.y) < 0.5) {
-                    body.current.setLinvel({ x: velocity.x, y: JUMP_FORCE, z: velocity.z }, true)
+        // BVH Ground Detection & Custom Gravity (Only when NOT flying)
+        if (!flyMode && colliderMesh) {
+            const pos = body.current.translation()
+            
+            // Raycast down from player position
+            raycaster.set(
+                new THREE.Vector3(pos.x, pos.y + 1, pos.z),
+                new THREE.Vector3(0, -1, 0)
+            )
+            
+            const hits = raycaster.intersectObject(colliderMesh, false)
+            
+            if (hits.length > 0) {
+                const groundY = hits[0].point.y
+                const playerFeetY = pos.y
+                const distanceToGround = playerFeetY - groundY
+                
+                // Check if grounded (within threshold)
+                if (distanceToGround <= 0.15 && velocityY.current <= 0) {
+                    isGrounded.current = true
+                    velocityY.current = 0
+                    // Snap to ground
+                    body.current.setTranslation({ x: pos.x, y: groundY + 0.05, z: pos.z }, true)
+                } else if (distanceToGround < PLAYER_HEIGHT && velocityY.current <= 0) {
+                    // Approaching ground - snap
+                    isGrounded.current = true
+                    velocityY.current = 0
+                    body.current.setTranslation({ x: pos.x, y: groundY + 0.05, z: pos.z }, true)
+                } else {
+                    isGrounded.current = false
+                }
+            } else {
+                isGrounded.current = false
+            }
+            
+            // Apply gravity if not grounded
+            if (!isGrounded.current) {
+                velocityY.current -= GRAVITY * delta
+                const newY = pos.y + velocityY.current * delta
+                body.current.setTranslation({ x: pos.x, y: newY, z: pos.z }, true)
+            }
+            
+            // Jump Logic
+            if (jump && isGrounded.current) {
+                const now = Date.now()
+                if (now - lastJumpTime.current > 300) {
+                    velocityY.current = JUMP_FORCE
+                    isGrounded.current = false
                     lastJumpTime.current = now
+                }
+            }
+        }
+        
+        // Fallback: no collider mesh yet, use simple gravity
+        if (!flyMode && !colliderMesh) {
+            const pos = body.current.translation()
+            if (pos.y > 0) {
+                velocityY.current -= GRAVITY * delta
+                body.current.setTranslation({ x: pos.x, y: Math.max(0, pos.y + velocityY.current * delta), z: pos.z }, true)
+            } else {
+                velocityY.current = 0
+                isGrounded.current = true
+                if (jump) {
+                    velocityY.current = JUMP_FORCE
+                    isGrounded.current = false
                 }
             }
         }
