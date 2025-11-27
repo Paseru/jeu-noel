@@ -411,17 +411,25 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
         if (!flyMode && colliderMesh) {
             const pos = body.current.translation()
             
-            // Raycast down from above player head to find ground
+            // Raycast down from player feet to find ground below
             raycaster.set(
-                new THREE.Vector3(pos.x, pos.y + 10, pos.z),
+                new THREE.Vector3(pos.x, pos.y + 0.5, pos.z),
                 new THREE.Vector3(0, -1, 0)
             )
-            raycaster.far = 100
+            raycaster.far = 50
             
             const hits = raycaster.intersectObject(colliderMesh, false)
             
-            if (hits.length > 0) {
-                const groundY = hits[0].point.y
+            // Find the closest ground BELOW the player
+            let groundY: number | null = null
+            for (const hit of hits) {
+                if (hit.point.y <= pos.y + 0.3) {
+                    groundY = hit.point.y
+                    break
+                }
+            }
+            
+            if (groundY !== null) {
                 const distanceToGround = pos.y - groundY
                 
                 // Falling or on ground
@@ -431,7 +439,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
                         isGrounded.current = true
                         velocityY.current = 0
                         body.current.setTranslation({ x: pos.x, y: groundY + 0.1, z: pos.z }, true)
-                    } else if (distanceToGround < 2) {
+                    } else if (distanceToGround < 3) {
                         // Close to ground - apply gravity and check
                         isGrounded.current = false
                         velocityY.current -= GRAVITY * delta
@@ -448,7 +456,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
                         // Far from ground - fall
                         isGrounded.current = false
                         velocityY.current -= GRAVITY * delta
-                        velocityY.current = Math.max(velocityY.current, -50) // Terminal velocity
+                        velocityY.current = Math.max(velocityY.current, -50)
                         body.current.setTranslation({ x: pos.x, y: pos.y + velocityY.current * delta, z: pos.z }, true)
                     }
                 } else {
@@ -458,7 +466,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
                     body.current.setTranslation({ x: pos.x, y: pos.y + velocityY.current * delta, z: pos.z }, true)
                 }
             } else {
-                // No ground found - fall
+                // No ground found below - fall
                 isGrounded.current = false
                 velocityY.current -= GRAVITY * delta
                 velocityY.current = Math.max(velocityY.current, -50)
