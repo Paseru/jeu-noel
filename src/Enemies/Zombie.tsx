@@ -268,7 +268,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         dir: THREE.Vector3,
         pos: { x: number, y: number, z: number },
         world: any,
-        excludeRigidBodyHandle?: number
+        _excludeRigidBodyHandle?: number
     ) => {
         // Plus d'angles pour mieux contourner les obstacles
         const angles = [0, Math.PI / 8, -Math.PI / 8, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, Math.PI * 3/4, -Math.PI * 3/4]
@@ -297,35 +297,34 @@ export function Zombie({ spawnPoint }: ZombieProps) {
 
         const origins = generateOrigins()
 
+        // Normaliser la direction pour le raycast
+        const dirNormalized = dir.clone().normalize()
+
         // Check collision droit devant à toutes les hauteurs pour déclencher un pivot franc
         let frontHitDist = Infinity
-        let frontHitNormal: THREE.Vector3 | null = null
         for (const h of heights) {
             const rayOrigin = new THREE.Vector3(pos.x, pos.y + h, pos.z)
             const ray = new rapier.Ray(
                 new rapier.Vector3(rayOrigin.x, rayOrigin.y, rayOrigin.z),
-                new rapier.Vector3(dir.x, 0, dir.z)
+                new rapier.Vector3(dirNormalized.x, 0, dirNormalized.z)
             )
-            const hit = world.castRayAndGetNormal(ray, 2.0, true, undefined, undefined, undefined, excludeRigidBodyHandle) as any
-            if (hit && hit.toi < frontHitDist) {
+            // solid=false pour détecter les intersections avec trimesh
+            const hit = world.castRay(ray, 2.5, false)
+            if (hit !== null && hit.toi < frontHitDist) {
                 frontHitDist = hit.toi
-                if (hit.normal) frontHitNormal = new THREE.Vector3(hit.normal.x, 0, hit.normal.z).normalize()
             }
         }
 
         // Pivot d'urgence si un obstacle est très proche devant
-        if (frontHitDist < 1.2 && frontHitNormal) {
-            const left = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2)
-            const rightDir = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2)
-            // Choisir côté le plus opposé à la normale
-            const goLeft = left.dot(frontHitNormal) < rightDir.dot(frontHitNormal)
-            return goLeft ? left.normalize() : rightDir.normalize()
+        if (frontHitDist < 1.5) {
+            // Choisir un côté aléatoire pour éviter l'oscillation
+            const side = Math.random() > 0.5 ? Math.PI / 2 : -Math.PI / 2
+            return dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), side).normalize()
         }
 
         for (const angle of angles) {
-            const testDir = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle)
-            let closestHit = 5
-            let hitNormal: THREE.Vector3 | null = null
+            const testDir = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle).normalize()
+            let closestHit = 6
 
             // Tester depuis toutes les origines (toutes hauteurs + positions latérales)
             for (const o of origins) {
@@ -333,39 +332,19 @@ export function Zombie({ spawnPoint }: ZombieProps) {
                     new rapier.Vector3(o.x, o.y, o.z),
                     new rapier.Vector3(testDir.x, 0, testDir.z)
                 )
-                const hit = world.castRayAndGetNormal(
-                    ray,
-                    3.5,
-                    true,
-                    undefined,
-                    undefined,
-                    undefined,
-                    excludeRigidBodyHandle
-                ) as any
-                if (hit && hit.toi < closestHit) {
+                // solid=false pour détecter les intersections avec trimesh
+                const hit = world.castRay(ray, 4.0, false)
+                if (hit !== null && hit.toi < closestHit) {
                     closestHit = hit.toi
-                    if (hit.normal) {
-                        hitNormal = new THREE.Vector3(hit.normal.x, 0, hit.normal.z).normalize()
-                    }
                 }
             }
 
             // Score basé sur la distance libre + pénalité pour déviation
-            let score = closestHit - Math.abs(angle) * 0.3
-            let candidate = testDir
-
-            // Slide le long de la surface si proche d'un obstacle
-            if (hitNormal && closestHit < 1.5) {
-                const slide = testDir.clone().projectOnPlane(hitNormal).normalize()
-                if (slide.lengthSq() > 0.01) {
-                    candidate = slide
-                    score -= 0.2
-                }
-            }
+            const score = closestHit - Math.abs(angle) * 0.4
 
             if (score > bestScore) {
                 bestScore = score
-                bestDir = candidate
+                bestDir = testDir
             }
         }
         return bestDir.normalize()
