@@ -227,17 +227,23 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         if (!pathfinding || !navmeshLoadedRef.current) return false
 
         try {
-            const groupID = pathfinding.getGroup(ZONE_ID, start)
+            // Essayer de trouver le groupe depuis la position de départ
+            let groupID = pathfinding.getGroup(ZONE_ID, start)
+            
+            // Si pas trouvé, essayer depuis la cible
             if (groupID === null || groupID === undefined) {
-                console.warn('[Zombie] start position not on navmesh')
-                return false
+                groupID = pathfinding.getGroup(ZONE_ID, target)
+            }
+            
+            // Si toujours pas trouvé, utiliser le groupe 0 par défaut
+            if (groupID === null || groupID === undefined) {
+                groupID = 0
             }
 
             const closestStart = pathfinding.getClosestNode(start, ZONE_ID, groupID)
             const closestTarget = pathfinding.getClosestNode(target, ZONE_ID, groupID)
             
             if (!closestStart || !closestTarget) {
-                console.warn('[Zombie] could not find closest nodes')
                 return false
             }
 
@@ -248,11 +254,10 @@ export function Zombie({ spawnPoint }: ZombieProps) {
                 waypointIndexRef.current = 0
                 lastTargetRef.current = target.clone()
                 lastReplanRef.current = performance.now()
-                console.info('[Zombie] path found, length:', path.length)
                 return true
             }
         } catch (err) {
-            console.warn('[Zombie] pathfinding error:', err)
+            // Silencieux - fallback sur raycast avoidance
         }
 
         return false
