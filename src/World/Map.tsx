@@ -1,5 +1,5 @@
 import { useGLTF } from '@react-three/drei'
-import { RigidBody, CuboidCollider } from '@react-three/rapier'
+import { RigidBody } from '@react-three/rapier'
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { useGameStore } from '../stores/useGameStore'
@@ -131,19 +131,13 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
 
     return (
         <>
-            {/* Map visuals - NO physics collider (trimesh freezes on large maps) */}
-            <primitive object={solidScene} scale={scale} />
+            {/* Map with hull colliders - faster than trimesh */}
+            <RigidBody type="fixed" colliders="hull">
+                <primitive object={solidScene} scale={scale} />
+            </RigidBody>
 
             {/* Plants (Decoration) - No Physics */}
             <primitive object={plantScene} scale={scale} />
-
-            {/* Simple floor collider for walking */}
-            <RigidBody type="fixed" colliders={false}>
-                <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} visible={false}>
-                    <planeGeometry args={[500, 500]} />
-                </mesh>
-                <CuboidCollider args={[250, 0.1, 250]} position={[0, -0.1, 0]} />
-            </RigidBody>
 
             {/* Interactive Doors */}
             {doors.map((door, index) => (
