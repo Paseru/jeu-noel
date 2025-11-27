@@ -50,14 +50,13 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
 
                 materials.forEach(mat => {
                     if (mat) {
-                        if (!mat.userData.darkened) {
+                        // Only darken if material has a color property
+                        if (!mat.userData.darkened && mat.color) {
                             mat.color.multiplyScalar(0.8)
                             mat.userData.darkened = true
                         }
-                        mat.transparent = false
                         mat.depthWrite = true
                         if (mat.map) {
-                            mat.alphaTest = 0.5
                             mat.side = THREE.DoubleSide
                         }
                     }
