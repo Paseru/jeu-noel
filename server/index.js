@@ -29,7 +29,7 @@ const ROOMS = [
         navMeshPath: "/navmesh/navmesh_tacos.glb",
         maxPlayers: 40,
         spawnPoint: [-0.13, 2.06, 16.38],
-        zombieSpawnPoint: [-73.19, 4.78, -17.39],
+        zombieSpawnPoint: [15.09, 3.23, -10.32],
         summonPoint: [12.30, 0.66, 9.29]
     },
     {
