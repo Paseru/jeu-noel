@@ -258,7 +258,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         return false
     }
 
-    // Calcul direction avec évitement local + slide (amélioré)
+    // Calcul direction avec évitement local + slide (amélioré avec multi-hauteur)
     const steerWithAvoidance = (
         dir: THREE.Vector3,
         pos: { x: number, y: number, z: number },
@@ -270,35 +270,46 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         let bestDir = dir.clone()
         let bestScore = -Infinity
 
-        // Points de départ des rayons: centre + épaules pour sentir les piliers/arbres
-        const upOffset = 0.4
-        const base = new THREE.Vector3(pos.x, pos.y + upOffset, pos.z)
+        // Rayons à plusieurs hauteurs pour détecter différents types d'obstacles
+        const heights = [0.15, 0.4, 0.8, 1.2]
+        
+        // Vecteur latéral pour les rayons d'épaule
         const right = new THREE.Vector3(dir.z, 0, -dir.x)
         if (right.lengthSq() < 1e-5) right.set(1, 0, 0)
         right.normalize()
-        const origins = [
-            base,
-            base.clone().add(right.clone().multiplyScalar(0.4)),
-            base.clone().add(right.clone().multiplyScalar(-0.4))
-        ]
 
-        // Check collision droit devant pour déclencher un pivot franc
+        // Générer les origines à toutes les hauteurs et positions latérales
+        const generateOrigins = () => {
+            const origins: THREE.Vector3[] = []
+            for (const h of heights) {
+                const base = new THREE.Vector3(pos.x, pos.y + h, pos.z)
+                origins.push(base)
+                origins.push(base.clone().add(right.clone().multiplyScalar(0.35)))
+                origins.push(base.clone().add(right.clone().multiplyScalar(-0.35)))
+            }
+            return origins
+        }
+
+        const origins = generateOrigins()
+
+        // Check collision droit devant à toutes les hauteurs pour déclencher un pivot franc
         let frontHitDist = Infinity
         let frontHitNormal: THREE.Vector3 | null = null
-        {
+        for (const h of heights) {
+            const rayOrigin = new THREE.Vector3(pos.x, pos.y + h, pos.z)
             const ray = new rapier.Ray(
-                new rapier.Vector3(base.x, base.y, base.z),
+                new rapier.Vector3(rayOrigin.x, rayOrigin.y, rayOrigin.z),
                 new rapier.Vector3(dir.x, 0, dir.z)
             )
             const hit = world.castRayAndGetNormal(ray, 2.0, true, undefined, undefined, undefined, excludeRigidBodyHandle) as any
-            if (hit) {
+            if (hit && hit.toi < frontHitDist) {
                 frontHitDist = hit.toi
                 if (hit.normal) frontHitNormal = new THREE.Vector3(hit.normal.x, 0, hit.normal.z).normalize()
             }
         }
 
         // Pivot d'urgence si un obstacle est très proche devant
-        if (frontHitDist < 1.0 && frontHitNormal) {
+        if (frontHitDist < 1.2 && frontHitNormal) {
             const left = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2)
             const rightDir = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2)
             // Choisir côté le plus opposé à la normale
@@ -308,9 +319,10 @@ export function Zombie({ spawnPoint }: ZombieProps) {
 
         for (const angle of angles) {
             const testDir = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle)
-            let closestHit = 4
+            let closestHit = 5
             let hitNormal: THREE.Vector3 | null = null
 
+            // Tester depuis toutes les origines (toutes hauteurs + positions latérales)
             for (const o of origins) {
                 const ray = new rapier.Ray(
                     new rapier.Vector3(o.x, o.y, o.z),
@@ -318,7 +330,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
                 )
                 const hit = world.castRayAndGetNormal(
                     ray,
-                    3.0,
+                    3.5,
                     true,
                     undefined,
                     undefined,
@@ -338,7 +350,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
             let candidate = testDir
 
             // Slide le long de la surface si proche d'un obstacle
-            if (hitNormal && closestHit < 1.2) {
+            if (hitNormal && closestHit < 1.5) {
                 const slide = testDir.clone().projectOnPlane(hitNormal).normalize()
                 if (slide.lengthSq() > 0.01) {
                     candidate = slide
