@@ -16,9 +16,9 @@ const ROOMS = [
         mapImage: "/maps/sub.jpg",
         modelPath: "/models/subway (1)-opt.glb",
         maxPlayers: 40,
-        spawnPoint: [0, 100, 0],
-        zombieSpawnPoint: [10, 2, 10],
-        summonPoint: [0, 2, 5]
+        spawnPoint: [45.61, 14.53, -25.50],
+        zombieSpawnPoint: [36.98, 12.03, -37.23],
+        summonPoint: [36.98, 12.03, -37.23]
     }
 ];
 
