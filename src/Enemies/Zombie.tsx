@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useAnimations, useGLTF } from '@react-three/drei'
 import { CapsuleCollider, RigidBody, RapierRigidBody, useRapier } from '@react-three/rapier'
-import { Group } from 'three'
+import { Group, Mesh, BufferGeometry } from 'three'
 import * as THREE from 'three'
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
-import * as YUKA from 'yuka'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { Pathfinding } from 'three-pathfinding'
 import { useGameStore } from '../stores/useGameStore'
 import { useVoiceStore } from '../stores/useVoiceStore'
 import { AudioLoader, PositionalAudio } from 'three'
@@ -13,6 +14,7 @@ import { AudioLoader, PositionalAudio } from 'three'
 const RUN_SPEED = 5
 const ATTACK_RANGE = 1.0
 const NAVMESH_PATH = '/navmesh/navmesh_snowy_village.glb'
+const ZONE_ID = 'navmesh'
 
 type ZombieState = 'idle' | 'run' | 'attack'
 
@@ -41,7 +43,8 @@ export function Zombie({ spawnPoint }: ZombieProps) {
     const agonyBufferRef = useRef<AudioBuffer | null>(null)
     const wasCloseRef = useRef<boolean>(false)
     const [navMeshPath, setNavMeshPath] = useState<string>(NAVMESH_PATH)
-    const yukaNavMeshRef = useRef<any | null>(null)
+    const pathfindingRef = useRef<Pathfinding | null>(null)
+    const navmeshLoadedRef = useRef<boolean>(false)
     const pathRef = useRef<THREE.Vector3[]>([])
     const waypointIndexRef = useRef<number>(0)
     const lastTargetRef = useRef<THREE.Vector3 | null>(null)
@@ -173,63 +176,101 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         }
 
         setNavMeshPath(path || NAVMESH_PATH)
-        yukaNavMeshRef.current = null
+        pathfindingRef.current = null
+        navmeshLoadedRef.current = false
         pathRef.current = []
         waypointIndexRef.current = 0
     }, [currentRoomId, rooms])
 
-    // Charger le navmesh Yuka (silencieux si le fichier est absent)
+    // Charger le navmesh avec three-pathfinding
     useEffect(() => {
         let cancelled = false
         if (!navMeshPath) return
-        const loader = new YUKA.NavMeshLoader()
-        loader.load(navMeshPath).then((navMesh: any) => {
-            if (cancelled) return
-            yukaNavMeshRef.current = navMesh
-            console.info('[Zombie] yuka navmesh loaded', navMeshPath)
-        }).catch((err: any) => {
-            console.warn('[Zombie] navmesh not found, fallback to raycast avoidance', err)
-        })
+
+        const loader = new GLTFLoader()
+        loader.load(
+            navMeshPath,
+            (gltf) => {
+                if (cancelled) return
+                
+                let navmeshGeometry: BufferGeometry | null = null
+                gltf.scene.traverse((child) => {
+                    if (child instanceof Mesh && child.geometry) {
+                        navmeshGeometry = child.geometry
+                    }
+                })
+
+                if (navmeshGeometry) {
+                    const pathfinding = new Pathfinding()
+                    const zone = Pathfinding.createZone(navmeshGeometry)
+                    pathfinding.setZoneData(ZONE_ID, zone)
+                    pathfindingRef.current = pathfinding
+                    navmeshLoadedRef.current = true
+                    console.info('[Zombie] three-pathfinding navmesh loaded', navMeshPath)
+                } else {
+                    console.warn('[Zombie] no geometry found in navmesh', navMeshPath)
+                }
+            },
+            undefined,
+            (err) => {
+                console.warn('[Zombie] navmesh not found, fallback to raycast avoidance', err)
+            }
+        )
+
         return () => {
             cancelled = true
         }
     }, [navMeshPath])
 
     const replanPath = (start: THREE.Vector3, target: THREE.Vector3) => {
-        const nav = yukaNavMeshRef.current
-        if (!nav) return false
+        const pathfinding = pathfindingRef.current
+        if (!pathfinding || !navmeshLoadedRef.current) return false
 
-        const from = new YUKA.Vector3(start.x, start.y, start.z)
-        const to = new YUKA.Vector3(target.x, target.y, target.z)
-        const fromRegion = nav.getClosestRegion(from)
-        const toRegion = nav.getClosestRegion(to)
-        const path = nav.findPath(fromRegion ? fromRegion.centroid : from, toRegion ? toRegion.centroid : to)
+        try {
+            const groupID = pathfinding.getGroup(ZONE_ID, start)
+            if (groupID === null || groupID === undefined) {
+                console.warn('[Zombie] start position not on navmesh')
+                return false
+            }
 
-        if (path && path.length > 0) {
-            pathRef.current = path.map((p: any) => new THREE.Vector3(p.x, p.y, p.z))
-            waypointIndexRef.current = 0
-            lastTargetRef.current = target.clone()
-            lastReplanRef.current = performance.now()
-            console.info('[Zombie] yuka path len', path.length)
-            return true
+            const closestStart = pathfinding.getClosestNode(start, ZONE_ID, groupID)
+            const closestTarget = pathfinding.getClosestNode(target, ZONE_ID, groupID)
+            
+            if (!closestStart || !closestTarget) {
+                console.warn('[Zombie] could not find closest nodes')
+                return false
+            }
+
+            const path = pathfinding.findPath(closestStart, closestTarget, ZONE_ID, groupID)
+
+            if (path && path.length > 0) {
+                pathRef.current = path.map((p) => new THREE.Vector3(p.x, p.y, p.z))
+                waypointIndexRef.current = 0
+                lastTargetRef.current = target.clone()
+                lastReplanRef.current = performance.now()
+                console.info('[Zombie] path found, length:', path.length)
+                return true
+            }
+        } catch (err) {
+            console.warn('[Zombie] pathfinding error:', err)
         }
 
-        console.warn('[Zombie] navmesh path failed, fallback to raycast')
         return false
     }
 
-    // Calcul direction avec évitement local + slide
+    // Calcul direction avec évitement local + slide (amélioré)
     const steerWithAvoidance = (
         dir: THREE.Vector3,
         pos: { x: number, y: number, z: number },
         world: any,
         excludeRigidBodyHandle?: number
     ) => {
-        const angles = [0, Math.PI / 6, -Math.PI / 6, Math.PI / 3, -Math.PI / 3]
+        // Plus d'angles pour mieux contourner les obstacles
+        const angles = [0, Math.PI / 8, -Math.PI / 8, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, Math.PI * 3/4, -Math.PI * 3/4]
         let bestDir = dir.clone()
         let bestScore = -Infinity
 
-        // Points de départ des rayons: centre + épaules pour sentir les piliers
+        // Points de départ des rayons: centre + épaules pour sentir les piliers/arbres
         const upOffset = 0.4
         const base = new THREE.Vector3(pos.x, pos.y + upOffset, pos.z)
         const right = new THREE.Vector3(dir.z, 0, -dir.x)
@@ -237,8 +278,8 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         right.normalize()
         const origins = [
             base,
-            base.clone().add(right.clone().multiplyScalar(0.35)),
-            base.clone().add(right.clone().multiplyScalar(-0.35))
+            base.clone().add(right.clone().multiplyScalar(0.4)),
+            base.clone().add(right.clone().multiplyScalar(-0.4))
         ]
 
         // Check collision droit devant pour déclencher un pivot franc
@@ -249,16 +290,25 @@ export function Zombie({ spawnPoint }: ZombieProps) {
                 new rapier.Vector3(base.x, base.y, base.z),
                 new rapier.Vector3(dir.x, 0, dir.z)
             )
-            const hit = world.castRayAndGetNormal(ray, 1.4, true, undefined, undefined, undefined, excludeRigidBodyHandle) as any
+            const hit = world.castRayAndGetNormal(ray, 2.0, true, undefined, undefined, undefined, excludeRigidBodyHandle) as any
             if (hit) {
                 frontHitDist = hit.toi
                 if (hit.normal) frontHitNormal = new THREE.Vector3(hit.normal.x, 0, hit.normal.z).normalize()
             }
         }
 
+        // Pivot d'urgence si un obstacle est très proche devant
+        if (frontHitDist < 1.0 && frontHitNormal) {
+            const left = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2)
+            const rightDir = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2)
+            // Choisir côté le plus opposé à la normale
+            const goLeft = left.dot(frontHitNormal) < rightDir.dot(frontHitNormal)
+            return goLeft ? left.normalize() : rightDir.normalize()
+        }
+
         for (const angle of angles) {
             const testDir = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle)
-            let closestHit = 3
+            let closestHit = 4
             let hitNormal: THREE.Vector3 | null = null
 
             for (const o of origins) {
@@ -266,10 +316,9 @@ export function Zombie({ spawnPoint }: ZombieProps) {
                     new rapier.Vector3(o.x, o.y, o.z),
                     new rapier.Vector3(testDir.x, 0, testDir.z)
                 )
-                // Exclure le corps du zombie pour éviter l'auto-hit
                 const hit = world.castRayAndGetNormal(
                     ray,
-                    2.4,
+                    3.0,
                     true,
                     undefined,
                     undefined,
@@ -284,23 +333,19 @@ export function Zombie({ spawnPoint }: ZombieProps) {
                 }
             }
 
-            let score = closestHit - Math.abs(angle) * 0.5
+            // Score basé sur la distance libre + pénalité pour déviation
+            let score = closestHit - Math.abs(angle) * 0.3
             let candidate = testDir
-            if (hitNormal && closestHit < 0.9) {
+
+            // Slide le long de la surface si proche d'un obstacle
+            if (hitNormal && closestHit < 1.2) {
                 const slide = testDir.clone().projectOnPlane(hitNormal).normalize()
-                candidate = slide.lengthSq() > 0 ? slide : testDir
-                score -= 0.3
+                if (slide.lengthSq() > 0.01) {
+                    candidate = slide
+                    score -= 0.2
+                }
             }
 
-            // Pivot d'urgence si un obstacle est très proche devant
-            if (frontHitDist < 0.7 && frontHitNormal) {
-                const left = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2)
-                const right = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2)
-                // Choisir côté le plus opposé à la normale
-                const goLeft = left.dot(frontHitNormal) < right.dot(frontHitNormal)
-                candidate = goLeft ? left.normalize() : right.normalize()
-                score = 5 // force la priorité
-            }
             if (score > bestScore) {
                 bestScore = score
                 bestDir = candidate
@@ -472,7 +517,7 @@ export function Zombie({ spawnPoint }: ZombieProps) {
         const targetMoved = lastTargetRef.current ? lastTargetRef.current.distanceTo(targetVec3) > 1 : true
         const pathEmpty = pathRef.current.length === 0 || waypointIndexRef.current >= pathRef.current.length
         const replanCooldown = now - lastReplanRef.current > 1500
-        if (yukaNavMeshRef.current && (targetMoved || pathEmpty || replanCooldown)) {
+        if (pathfindingRef.current && (targetMoved || pathEmpty || replanCooldown)) {
             replanPath(currentPosVector, targetVec3)
         }
 
