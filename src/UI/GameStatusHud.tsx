@@ -78,6 +78,11 @@ export const GameStatusHud = () => {
         )
     }
     
+    // STARTING state - don't show HUD, GameStartingLoader handles it
+    if (infectedGameState === 'STARTING') {
+        return null
+    }
+    
     // PLAYING state
     if (infectedGameState === 'PLAYING') {
         return (

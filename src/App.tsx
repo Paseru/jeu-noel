@@ -15,6 +15,7 @@ import { InteractionPrompt } from './UI/InteractionPrompt'
 import PlayerList from './UI/PlayerList'
 import { DeathScreen } from './UI/DeathScreen'
 import Loader from './UI/Loader'
+import GameStartingLoader from './UI/GameStartingLoader'
 import GameStatusHud from './UI/GameStatusHud'
 import VoteScreen from './UI/VoteScreen'
 import SpectatorHud from './UI/SpectatorHud'
@@ -36,7 +37,7 @@ export default function App() {
     const menuAudioRef = useRef<HTMLAudioElement>(null)
     const gameAudioRef = useRef<HTMLAudioElement>(null)
 
-    const { phase, volumes, mapLoaded } = useGameStore()
+    const { phase, volumes, mapLoaded, infectedGameState } = useGameStore()
     useEffect(() => {
         const handleBeforeUnload = () => {
             useGameStore.getState().leaveRoom()
@@ -214,7 +215,10 @@ export default function App() {
             )}
 
             {/* Loader */}
-            {phase === 'PLAYING' && !mapLoaded && <Loader />}
+            {phase === 'PLAYING' && !mapLoaded && infectedGameState !== 'STARTING' && <Loader />}
+            
+            {/* Game Starting Loader (transition screen before game starts) */}
+            {phase === 'PLAYING' && infectedGameState === 'STARTING' && <GameStartingLoader />}
 
             {/* UI Overlay (Only when playing) */}
             {phase === 'PLAYING' && mapLoaded && (

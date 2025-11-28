@@ -32,6 +32,8 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     const players = useGameStore((state) => state.players)
     const attack = useGameStore((state) => state.attack)
     const playerId = useGameStore((state) => state.playerId)
+    const pendingSpawnPoint = useGameStore((state) => state.pendingSpawnPoint)
+    const pendingZombieSpawnPoint = useGameStore((state) => state.pendingZombieSpawnPoint)
 
     // Reference to the character mesh group for rotation
     const characterRef = useRef<THREE.Group>(null)
@@ -70,6 +72,22 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             setCameraMode(forcedCameraMode)
         }
     }, [forcedCameraMode, cameraMode])
+    
+    // Track previous game state to detect transition to PLAYING
+    const prevGameState = useRef<string | null>(null)
+    
+    // Teleport player when game transitions from STARTING to PLAYING
+    useEffect(() => {
+        if (prevGameState.current === 'STARTING' && infectedGameState === 'PLAYING') {
+            if (body.current && pendingSpawnPoint && pendingZombieSpawnPoint) {
+                const spawn = isInfected ? pendingZombieSpawnPoint : pendingSpawnPoint
+                body.current.setTranslation({ x: spawn[0], y: spawn[1], z: spawn[2] }, true)
+                body.current.setLinvel({ x: 0, y: 0, z: 0 }, true)
+                console.log(`Teleported to ${isInfected ? 'zombie' : 'survivor'} spawn:`, spawn)
+            }
+        }
+        prevGameState.current = infectedGameState
+    }, [infectedGameState, isInfected, pendingSpawnPoint, pendingZombieSpawnPoint])
 
     // Audio Listener (The "Ears" of the player)
     useEffect(() => {
@@ -222,6 +240,14 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             const room = useGameStore.getState().rooms.find(r => r.id === useGameStore.getState().currentRoomId)
             const spawn = room?.spawnPoint || [0, 10, 0]
             body.current.setTranslation({ x: spawn[0], y: spawn[1], z: spawn[2] }, true)
+            return
+        }
+        
+        // Freeze player during STARTING phase (transition screen)
+        const currentGameState = useGameStore.getState().infectedGameState
+        if (currentGameState === 'STARTING') {
+            body.current.setGravityScale(0, true)
+            body.current.setLinvel({ x: 0, y: 0, z: 0 }, true)
             return
         }
 
@@ -504,6 +530,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
                         isMoving={isMoving}
                         isRunning={isRunning}
                         showNameplate={false}
+                        isInfected={isInfected}
                     />
                 </group>
             )}

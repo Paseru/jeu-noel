@@ -179,7 +179,9 @@ export default function CharacterModel({
 
     return (
         <group ref={group} dispose={null}>
-            <primitive object={cloneScene} />
+            <group scale={isInfected ? 0.5 : 1}>
+                <primitive object={cloneScene} />
+            </group>
 
             {/* Nameplate - Only visible when playing AND showNameplate is true AND within distance */}
             {phase === 'PLAYING' && showNameplate && isNameplateVisible && (

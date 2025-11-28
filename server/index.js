@@ -50,6 +50,7 @@ const ROOMS = [
 
 const MIN_PLAYERS = 3;
 const COUNTDOWN_SECONDS = 60;
+const STARTING_SECONDS = 5;
 const VOTE_SECONDS = 20;
 const ATTACK_RANGE = 1.0;
 
@@ -62,9 +63,10 @@ let roomGameState = {}; // { roomId: { state, countdownEnd, infectedPlayers, vot
 const STALE_PLAYER_MS = 15000;
 
 const getInitialRoomState = () => ({
-    state: 'WAITING', // WAITING, COUNTDOWN, PLAYING, VOTING
+    state: 'WAITING', // WAITING, COUNTDOWN, STARTING, PLAYING, VOTING
     countdownEnd: null,
     infectedPlayers: [], // array of player IDs who are zombies
+    pendingInfectedId: null, // player ID who will become zombie (set during STARTING)
     votes: {}, // { playerId: mapId }
     voteEnd: null,
 });
@@ -133,17 +135,61 @@ const startGame = (roomId) => {
     const randomIndex = Math.floor(Math.random() * roomPlayers.length);
     const infectedPlayer = roomPlayers[randomIndex];
     
-    roomState.state = 'PLAYING';
-    roomState.countdownEnd = null;
-    roomState.infectedPlayers = [infectedPlayer.id];
+    const room = ROOMS.find(r => r.id === roomId);
+    const spawnPoint = room?.spawnPoint || [0, 5, 0];
+    const zombieSpawnPoint = room?.zombieSpawnPoint || [0, 5, 5];
+    
+    // Enter STARTING state (transition screen for 5 seconds)
+    roomState.state = 'STARTING';
+    roomState.countdownEnd = Date.now() + (STARTING_SECONDS * 1000);
+    roomState.pendingInfectedId = infectedPlayer.id;
+    roomState.infectedPlayers = [];
+    
+    // Send gameStarting event to show transition screen
+    io.to(roomId).emit('gameStarting', {
+        infectedPlayerId: infectedPlayer.id,
+        spawnPoint,
+        zombieSpawnPoint,
+        startingDuration: STARTING_SECONDS,
+    });
+    
+    broadcastGameState(roomId);
+    console.log(`[${roomId}] Game starting! Infected will be: ${infectedPlayer.nickname}`);
+};
+
+const actuallyStartGame = (roomId) => {
+    const roomState = roomGameState[roomId];
+    if (!roomState || roomState.state !== 'STARTING') return;
+    
+    const roomPlayers = getRoomPlayers(roomId);
+    const infectedPlayerId = roomState.pendingInfectedId;
+    const infectedPlayer = roomPlayers.find(p => p.id === infectedPlayerId);
+    
+    if (!infectedPlayer) {
+        // Infected player left, pick a new one
+        if (roomPlayers.length < MIN_PLAYERS) {
+            roomState.state = 'WAITING';
+            roomState.countdownEnd = null;
+            roomState.pendingInfectedId = null;
+            broadcastGameState(roomId);
+            checkRoomState(roomId);
+            return;
+        }
+        const randomIndex = Math.floor(Math.random() * roomPlayers.length);
+        roomState.pendingInfectedId = roomPlayers[randomIndex].id;
+    }
     
     const room = ROOMS.find(r => r.id === roomId);
     const spawnPoint = room?.spawnPoint || [0, 5, 0];
     const zombieSpawnPoint = room?.zombieSpawnPoint || [0, 5, 5];
     
+    roomState.state = 'PLAYING';
+    roomState.countdownEnd = null;
+    roomState.infectedPlayers = [roomState.pendingInfectedId];
+    
     // Teleport all players
     roomPlayers.forEach(player => {
-        if (player.id === infectedPlayer.id) {
+        if (player.id === roomState.pendingInfectedId) {
             player.position = zombieSpawnPoint;
             player.isInfected = true;
         } else {
@@ -153,15 +199,16 @@ const startGame = (roomId) => {
         player.isDead = false;
     });
     
-    // Send updated positions to all
+    // Send gameStart event to actually start the game
     io.to(roomId).emit('gameStart', {
-        infectedPlayerId: infectedPlayer.id,
+        infectedPlayerId: roomState.pendingInfectedId,
         spawnPoint,
         zombieSpawnPoint,
     });
     
+    roomState.pendingInfectedId = null;
     broadcastGameState(roomId);
-    console.log(`[${roomId}] Game started! Infected: ${infectedPlayer.nickname}`);
+    console.log(`[${roomId}] Game started! Infected: ${infectedPlayer?.nickname || 'Unknown'}`);
 };
 
 const infectPlayer = (roomId, victimId, attackerId) => {
@@ -274,13 +321,17 @@ const checkRoomState = (roomId) => {
     }
 };
 
-// Game loop - check countdowns and votes
+// Game loop - check countdowns, starting, and votes
 setInterval(() => {
     const now = Date.now();
     
     Object.entries(roomGameState).forEach(([roomId, state]) => {
         if (state.state === 'COUNTDOWN' && state.countdownEnd && now >= state.countdownEnd) {
             startGame(roomId);
+        }
+        
+        if (state.state === 'STARTING' && state.countdownEnd && now >= state.countdownEnd) {
+            actuallyStartGame(roomId);
         }
         
         if (state.state === 'VOTING' && state.voteEnd && now >= state.voteEnd) {

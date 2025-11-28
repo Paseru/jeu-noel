@@ -11,7 +11,8 @@ export const DeathScreen = () => {
     
     // Detect when player becomes infected
     useEffect(() => {
-        if (playerId && infectedPlayers.includes(playerId) && !wasInfected && infectedGameState === 'PLAYING') {
+        const isInGame = infectedGameState === 'PLAYING' || infectedGameState === 'STARTING'
+        if (playerId && infectedPlayers.includes(playerId) && !wasInfected && isInGame) {
             setWasInfected(true)
             setShowInfectedMessage(true)
             // Hide message after 3 seconds
@@ -20,10 +21,11 @@ export const DeathScreen = () => {
         }
     }, [playerId, infectedPlayers, wasInfected, infectedGameState])
     
-    // Reset wasInfected when game state changes
+    // Reset wasInfected when game ends
     useEffect(() => {
-        if (infectedGameState !== 'PLAYING') {
+        if (infectedGameState === 'WAITING' || infectedGameState === 'VOTING') {
             setWasInfected(false)
+            setShowInfectedMessage(false)
         }
     }, [infectedGameState])
 

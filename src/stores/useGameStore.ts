@@ -49,7 +49,7 @@ interface MapVoteOption {
     mapImage: string
 }
 
-type InfectedGameState = 'WAITING' | 'COUNTDOWN' | 'PLAYING' | 'VOTING'
+type InfectedGameState = 'WAITING' | 'COUNTDOWN' | 'STARTING' | 'PLAYING' | 'VOTING'
 
 interface GameState {
     phase: 'MENU' | 'PLAYING'
@@ -72,6 +72,11 @@ interface GameState {
     votes: Record<string, number>
     voteEnd: number | null
     myVote: string | null
+    
+    // Pending spawn points (set during STARTING phase)
+    pendingSpawnPoint: [number, number, number] | null
+    pendingZombieSpawnPoint: [number, number, number] | null
+    startingCountdownEnd: number | null
     
     isPlayerDead: boolean
     setPlayerDead: (dead: boolean) => void
@@ -178,6 +183,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     votes: {},
     voteEnd: null,
     myVote: null,
+    
+    // Pending spawn points defaults
+    pendingSpawnPoint: null,
+    pendingZombieSpawnPoint: null,
+    startingCountdownEnd: null,
     
     isPlayerDead: false,
     setPlayerDead: (dead) => {
@@ -386,13 +396,29 @@ export const useGameStore = create<GameState>((set, get) => ({
             })
         })
         
-        socket.on('gameStart', ({ infectedPlayerId }) => {
+        socket.on('gameStarting', ({ infectedPlayerId, spawnPoint, zombieSpawnPoint, startingDuration }) => {
+            const playerId = get().playerId
+            const isInfected = playerId === infectedPlayerId
+            set({
+                infectedGameState: 'STARTING',
+                isInfected,
+                infectedPlayers: [infectedPlayerId],
+                pendingSpawnPoint: spawnPoint,
+                pendingZombieSpawnPoint: zombieSpawnPoint,
+                startingCountdownEnd: Date.now() + (startingDuration * 1000),
+            })
+            console.log(`Game starting! You will be ${isInfected ? 'INFECTED' : 'a SURVIVOR'}`)
+        })
+        
+        socket.on('gameStart', ({ infectedPlayerId, spawnPoint, zombieSpawnPoint }) => {
             const playerId = get().playerId
             const isInfected = playerId === infectedPlayerId
             set({
                 infectedGameState: 'PLAYING',
                 isInfected,
                 infectedPlayers: [infectedPlayerId],
+                pendingSpawnPoint: spawnPoint,
+                pendingZombieSpawnPoint: zombieSpawnPoint,
             })
             console.log(`Game started! You are ${isInfected ? 'INFECTED' : 'a SURVIVOR'}`)
         })
@@ -525,6 +551,9 @@ export const useGameStore = create<GameState>((set, get) => ({
             votes: {},
             voteEnd: null,
             myVote: null,
+            pendingSpawnPoint: null,
+            pendingZombieSpawnPoint: null,
+            startingCountdownEnd: null,
         })
     },
 
