@@ -11,40 +11,60 @@ const io = new Server(PORT, {
 // Define available rooms (servers)
 const ROOMS = [
     {
-        id: "server-subway",
-        name: "Subway",
-        mapImage: "/maps/sub.jpg",
-        modelPath: "/models/Subway.glb",
-        maxPlayers: 40,
-        spawnPoint: [45.61, 14.53, -25.50],
-        zombieSpawnPoint: [36.98, 12.03, -37.23],
-        summonPoint: [36.98, 12.03, -37.23]
-    },
-    {
-        id: "server-factory",
-        name: "Factory Extraction",
-        mapImage: "/maps/factory.jpg",
-        modelPath: "/models/rods_factory_extraction_room.glb",
+        id: "server-assault",
+        name: "CS Assault",
+        mapImage: "/maps/assault.jpg",
+        modelPath: "/models/cs_assault.glb",
         maxPlayers: 40,
         spawnPoint: [0, 5, 0],
         zombieSpawnPoint: [0, 5, 5],
         summonPoint: [0, 5, 5]
     },
     {
-        id: "server-hospital",
-        name: "Hospital",
-        mapImage: "/maps/hospital.jpg",
-        modelPath: "/models/the_hospital_2_of_4.glb",
+        id: "server-aztec",
+        name: "DE Aztec",
+        mapImage: "/maps/aztec.jpg",
+        modelPath: "/models/de_aztec.glb",
         maxPlayers: 40,
         spawnPoint: [0, 5, 0],
         zombieSpawnPoint: [0, 5, 5],
         summonPoint: [0, 5, 5]
     },
     {
-        id: "server-petroyal",
-        name: "Pet Royal",
-        mapImage: "/maps/petroyal.jpg",
-        modelPath: "/models/free_fire_pet_royal.glb",
+        id: "server-farm",
+        name: "Farm",
+        mapImage: "/maps/farm.jpg",
+        modelPath: "/models/farm.glb",
+        maxPlayers: 40,
+        spawnPoint: [0, 5, 0],
+        zombieSpawnPoint: [0, 5, 5],
+        summonPoint: [0, 5, 5]
+    },
+    {
+        id: "server-carpark",
+        name: "Car Park",
+        mapImage: "/maps/carpark.jpg",
+        modelPath: "/models/gm_car_park.glb",
+        maxPlayers: 40,
+        spawnPoint: [0, 5, 0],
+        zombieSpawnPoint: [0, 5, 5],
+        summonPoint: [0, 5, 5]
+    },
+    {
+        id: "server-mansion",
+        name: "Playboy Mansion",
+        mapImage: "/maps/mansion.jpg",
+        modelPath: "/models/gm_playboy_mansion.glb",
+        maxPlayers: 40,
+        spawnPoint: [0, 5, 0],
+        zombieSpawnPoint: [0, 5, 5],
+        summonPoint: [0, 5, 5]
+    },
+    {
+        id: "server-village",
+        name: "Snowy Village",
+        mapImage: "/maps/village.jpg",
+        modelPath: "/models/snowy_village__ps1_environment.glb",
         maxPlayers: 40,
         spawnPoint: [0, 5, 0],
         zombieSpawnPoint: [0, 5, 5],
