@@ -18,7 +18,13 @@ const sanitizeGeometry = (geometry: THREE.BufferGeometry): THREE.BufferGeometry 
 
     // De-interleave if needed
     const positionArray = new Float32Array(posAttr.count * posAttr.itemSize)
-    ;(posAttr as any).toArray(positionArray)
+    for (let i = 0; i < posAttr.count; i++) {
+        const base = i * posAttr.itemSize
+        positionArray[base] = (posAttr as any).getX(i)
+        if (posAttr.itemSize > 1) positionArray[base + 1] = (posAttr as any).getY(i)
+        if (posAttr.itemSize > 2) positionArray[base + 2] = (posAttr as any).getZ(i)
+        if (posAttr.itemSize > 3) positionArray[base + 3] = (posAttr as any).getW ? (posAttr as any).getW(i) : 0
+    }
     const position = new THREE.BufferAttribute(positionArray, posAttr.itemSize)
 
     const geo = new THREE.BufferGeometry()
