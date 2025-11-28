@@ -127,6 +127,47 @@ export default function CharacterModel({
         wasBeingInfectedRef.current = isBeingInfected
     }, [isBeingInfected, audioListener, sfxVolume])
 
+    // Zombie ambient sound (loop while infected)
+    const zombieSoundRef = useRef<ThreePositionalAudio | null>(null)
+    
+    useEffect(() => {
+        if (!audioListener || !group.current) return
+        
+        if (isInfected && !zombieSoundRef.current) {
+            const loader = new THREE.AudioLoader()
+            loader.load('/sounds/zombie/zombie sound.mp3', (buffer) => {
+                if (!group.current || zombieSoundRef.current) return
+                
+                const sound = new ThreePositionalAudio(audioListener)
+                sound.setBuffer(buffer)
+                sound.setRefDistance(2)
+                sound.setMaxDistance(20)
+                sound.setRolloffFactor(1)
+                sound.setDistanceModel('linear')
+                sound.setVolume(sfxVolume * 0.5)
+                sound.setLoop(true)
+                
+                group.current.add(sound)
+                sound.play()
+                zombieSoundRef.current = sound
+            })
+        } else if (!isInfected && zombieSoundRef.current) {
+            zombieSoundRef.current.stop()
+            group.current?.remove(zombieSoundRef.current)
+            zombieSoundRef.current.disconnect()
+            zombieSoundRef.current = null
+        }
+        
+        return () => {
+            if (zombieSoundRef.current) {
+                zombieSoundRef.current.stop()
+                group.current?.remove(zombieSoundRef.current)
+                zombieSoundRef.current.disconnect()
+                zombieSoundRef.current = null
+            }
+        }
+    }, [isInfected, audioListener, sfxVolume])
+
     // Smooth action switching to avoid momentary T-poses on key press
     const activeActionRef = useRef<THREE.AnimationAction | null>(null)
     const isPlayingAttack = useRef(false)
