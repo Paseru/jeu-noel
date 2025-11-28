@@ -19,6 +19,36 @@ const ROOMS = [
         spawnPoint: [45.61, 14.53, -25.50],
         zombieSpawnPoint: [36.98, 12.03, -37.23],
         summonPoint: [36.98, 12.03, -37.23]
+    },
+    {
+        id: "server-factory",
+        name: "Factory Extraction",
+        mapImage: "/maps/factory.jpg",
+        modelPath: "/models/rods_factory_extraction_room.glb",
+        maxPlayers: 40,
+        spawnPoint: [0, 5, 0],
+        zombieSpawnPoint: [0, 5, 5],
+        summonPoint: [0, 5, 5]
+    },
+    {
+        id: "server-hospital",
+        name: "Hospital",
+        mapImage: "/maps/hospital.jpg",
+        modelPath: "/models/the_hospital_2_of_4.glb",
+        maxPlayers: 40,
+        spawnPoint: [0, 5, 0],
+        zombieSpawnPoint: [0, 5, 5],
+        summonPoint: [0, 5, 5]
+    },
+    {
+        id: "server-petroyal",
+        name: "Pet Royal",
+        mapImage: "/maps/petroyal.jpg",
+        modelPath: "/models/free_fire_pet_royal.glb",
+        maxPlayers: 40,
+        spawnPoint: [0, 5, 0],
+        zombieSpawnPoint: [0, 5, 5],
+        summonPoint: [0, 5, 5]
     }
 ];
 
