@@ -14,6 +14,7 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
     const scene = gltf?.scene as THREE.Scene | undefined
     const setMapLoaded = useGameStore((state) => state.setMapLoaded)
     const setColliderMesh = useCollisionStore((state) => state.setColliderMesh)
+    const setFallbackFloorY = useCollisionStore((state) => state.setFallbackFloorY)
 
     // Extract plants to separate group
     const { solidScene, plantScene } = useMemo(() => {
@@ -87,11 +88,14 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
     useEffect(() => {
         if (!solidScene) return
 
+        setMapLoaded(false)
+
         // Small delay to ensure scene is fully loaded
         const timer = setTimeout(() => {
             const geometries: THREE.BufferGeometry[] = []
             const tempMatrix = new THREE.Matrix4()
             const scaleMatrix = new THREE.Matrix4().makeScale(scale, scale, scale)
+            let worldMinY = Number.POSITIVE_INFINITY
 
             solidScene.updateMatrixWorld(true)
 
@@ -101,12 +105,21 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
                     // Apply world transform then scale
                     tempMatrix.copy(child.matrixWorld).multiply(scaleMatrix)
                     clonedGeo.applyMatrix4(tempMatrix)
+
+                    // Track world-space min Y for fallback floor
+                    clonedGeo.computeBoundingBox()
+                    const bb = clonedGeo.boundingBox
+                    if (bb) {
+                        worldMinY = Math.min(worldMinY, bb.min.y)
+                    }
+
                     geometries.push(clonedGeo)
                 }
             })
 
             if (geometries.length === 0) {
                 console.warn('[Map] No geometries found for BVH')
+                setFallbackFloorY(null)
                 return
             }
 
@@ -116,6 +129,7 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
                 const mergedGeometry = mergeGeometries(geometries, false)
                 if (!mergedGeometry) {
                     console.warn('[Map] Failed to merge geometries')
+                    setFallbackFloorY(null)
                     return
                 }
 
@@ -129,25 +143,24 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
                     new THREE.MeshBasicMaterial({ visible: false })
                 )
                 colliderMesh.name = 'BVH_Collider'
-                
+
+                setFallbackFloorY(Number.isFinite(worldMinY) ? worldMinY : null)
                 setColliderMesh(colliderMesh)
+                setMapLoaded(true)
                 console.log('[Map] BVH collider ready!')
             } catch (err) {
                 console.error('[Map] BVH build failed:', err)
+                setFallbackFloorY(null)
             }
         }, 100)
 
         return () => {
             clearTimeout(timer)
             setColliderMesh(null)
+            setFallbackFloorY(null)
+            setMapLoaded(false)
         }
-    }, [solidScene, scale, setColliderMesh])
-
-    // Signal map readiness
-    useEffect(() => {
-        setMapLoaded(true)
-        return () => setMapLoaded(false)
-    }, [modelPath, setMapLoaded])
+    }, [solidScene, scale, setColliderMesh, setFallbackFloorY, setMapLoaded])
 
     return (
         <>

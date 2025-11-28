@@ -29,7 +29,10 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     const body = useRef<RapierRigidBody>(null!)
     const [subscribeKeys, getKeys] = useKeyboardControls()
     const { camera, scene } = useThree()
-    const colliderMesh = useCollisionStore((state) => state.colliderMesh)
+    const { colliderMesh, fallbackFloorY } = useCollisionStore((state) => ({
+        colliderMesh: state.colliderMesh,
+        fallbackFloorY: state.fallbackFloorY
+    }))
 
     // Reference to the character mesh group for rotation
     const characterRef = useRef<THREE.Group>(null)
@@ -484,19 +487,26 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             }
         }
         
-        // Fallback: no collider mesh yet, use simple gravity
+        // Fallback: no collider mesh yet, use simple gravity to a safe floor below the map
         if (!flyMode && !colliderMesh) {
             const pos = body.current.translation()
-            if (pos.y > 0) {
-                velocityY.current -= GRAVITY * delta
-                body.current.setTranslation({ x: pos.x, y: Math.max(0, pos.y + velocityY.current * delta), z: pos.z }, true)
-            } else {
+            const floorY = fallbackFloorY ?? -1000 // keep well below subway levels
+
+            velocityY.current -= GRAVITY * delta
+            velocityY.current = Math.max(velocityY.current, -50)
+            const newY = pos.y + velocityY.current * delta
+
+            if (newY <= floorY) {
+                body.current.setTranslation({ x: pos.x, y: floorY, z: pos.z }, true)
                 velocityY.current = 0
                 isGrounded.current = true
                 if (jump) {
                     velocityY.current = JUMP_FORCE
                     isGrounded.current = false
                 }
+            } else {
+                body.current.setTranslation({ x: pos.x, y: newY, z: pos.z }, true)
+                isGrounded.current = false
             }
         }
     })
