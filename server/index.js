@@ -310,6 +310,18 @@ const checkRoomState = (roomId) => {
     const roomPlayers = getRoomPlayers(roomId);
     const playerCount = roomPlayers.length;
     
+    // Reset to WAITING if room is empty
+    if (playerCount === 0 && roomState.state !== 'WAITING') {
+        console.log(`[${roomId}] Room empty, resetting to WAITING`);
+        roomState.state = 'WAITING';
+        roomState.countdownEnd = null;
+        roomState.infectedPlayers = [];
+        roomState.pendingInfectedId = null;
+        roomState.votes = {};
+        roomState.voteEnd = null;
+        return;
+    }
+    
     if (roomState.state === 'WAITING') {
         if (playerCount >= MIN_PLAYERS) {
             startCountdown(roomId);
