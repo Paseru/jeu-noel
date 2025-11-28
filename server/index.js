@@ -8,7 +8,7 @@ const io = new Server(PORT, {
     },
 });
 
-// Define available rooms (servers)
+// Define available rooms (maps)
 const ROOMS = [
     {
         id: "server-assault",
@@ -18,7 +18,6 @@ const ROOMS = [
         maxPlayers: 40,
         spawnPoint: [34.32, 9.45, -38.86],
         zombieSpawnPoint: [-3.52, 6.37, 33.50],
-        summonPoint: [0, 5, 5]
     },
     {
         id: "server-aztec",
@@ -28,7 +27,6 @@ const ROOMS = [
         maxPlayers: 40,
         spawnPoint: [0, 5, 0],
         zombieSpawnPoint: [0, 5, 5],
-        summonPoint: [0, 5, 5]
     },
     {
         id: "server-carpark",
@@ -38,7 +36,6 @@ const ROOMS = [
         maxPlayers: 40,
         spawnPoint: [0, 5, 0],
         zombieSpawnPoint: [0, 5, 5],
-        summonPoint: [0, 5, 5]
     },
     {
         id: "server-mansion",
@@ -48,38 +45,249 @@ const ROOMS = [
         maxPlayers: 40,
         spawnPoint: [0, 5, 0],
         zombieSpawnPoint: [0, 5, 5],
-        summonPoint: [0, 5, 5]
     }
 ];
 
+const MIN_PLAYERS = 3;
+const COUNTDOWN_SECONDS = 60;
+const VOTE_SECONDS = 20;
+const ATTACK_RANGE = 1.0;
+
 let players = {}; // { socketId: { ...playerData, roomId, lastSeen } }
-let roomZombies = {}; // { roomId: [{ id, spawnPoint }] }
 let nextCharacterIndex = 1;
 
-const STALE_PLAYER_MS = 15000; // remove players that haven't heartbeat'ed for 15s
-const ZOMBIE_COOLDOWN_MS = 1500; // throttle spawn requests per socket
-const lastSpawnBySocket = {}; // { socketId: timestamp }
+// Game state per room
+let roomGameState = {}; // { roomId: { state, countdownEnd, infectedPlayers, votes, voteEnd } }
 
-const clearZombiesForRoom = (roomId, reason) => {
-    if (roomZombies[roomId]?.length) {
-        roomZombies[roomId] = [];
-        io.to(roomId).emit("zombiesCleared");
-        console.log(`Cleared zombies in ${roomId}: ${reason}`);
-    }
+const STALE_PLAYER_MS = 15000;
+
+const getInitialRoomState = () => ({
+    state: 'WAITING', // WAITING, COUNTDOWN, PLAYING, VOTING
+    countdownEnd: null,
+    infectedPlayers: [], // array of player IDs who are zombies
+    votes: {}, // { playerId: mapId }
+    voteEnd: null,
+});
+
+const getRoomPlayers = (roomId) => {
+    return Object.values(players).filter(p => p.roomId === roomId);
 };
 
-const evaluateRoomState = (roomId) => {
-    const roomPlayers = Object.values(players).filter(p => p.roomId === roomId);
-    if (roomPlayers.length === 0) {
-        clearZombiesForRoom(roomId, "room empty");
+const getSurvivors = (roomId) => {
+    const roomState = roomGameState[roomId];
+    if (!roomState) return [];
+    return getRoomPlayers(roomId).filter(p => !roomState.infectedPlayers.includes(p.id));
+};
+
+const broadcastGameState = (roomId) => {
+    const roomState = roomGameState[roomId];
+    if (!roomState) return;
+    
+    const roomPlayers = getRoomPlayers(roomId);
+    const survivors = getSurvivors(roomId);
+    
+    io.to(roomId).emit('gameStateUpdate', {
+        state: roomState.state,
+        countdownEnd: roomState.countdownEnd,
+        infectedPlayers: roomState.infectedPlayers,
+        playerCount: roomPlayers.length,
+        survivorCount: survivors.length,
+        minPlayers: MIN_PLAYERS,
+    });
+};
+
+const startCountdown = (roomId) => {
+    const roomState = roomGameState[roomId];
+    if (!roomState || roomState.state !== 'WAITING') return;
+    
+    roomState.state = 'COUNTDOWN';
+    roomState.countdownEnd = Date.now() + (COUNTDOWN_SECONDS * 1000);
+    roomState.infectedPlayers = [];
+    
+    broadcastGameState(roomId);
+    console.log(`[${roomId}] Countdown started`);
+};
+
+const cancelCountdown = (roomId) => {
+    const roomState = roomGameState[roomId];
+    if (!roomState || roomState.state !== 'COUNTDOWN') return;
+    
+    roomState.state = 'WAITING';
+    roomState.countdownEnd = null;
+    
+    broadcastGameState(roomId);
+    console.log(`[${roomId}] Countdown cancelled - not enough players`);
+};
+
+const startGame = (roomId) => {
+    const roomState = roomGameState[roomId];
+    if (!roomState) return;
+    
+    const roomPlayers = getRoomPlayers(roomId);
+    if (roomPlayers.length < MIN_PLAYERS) {
+        cancelCountdown(roomId);
         return;
     }
+    
+    // Choose random player to be infected
+    const randomIndex = Math.floor(Math.random() * roomPlayers.length);
+    const infectedPlayer = roomPlayers[randomIndex];
+    
+    roomState.state = 'PLAYING';
+    roomState.countdownEnd = null;
+    roomState.infectedPlayers = [infectedPlayer.id];
+    
+    const room = ROOMS.find(r => r.id === roomId);
+    const spawnPoint = room?.spawnPoint || [0, 5, 0];
+    const zombieSpawnPoint = room?.zombieSpawnPoint || [0, 5, 5];
+    
+    // Teleport all players
+    roomPlayers.forEach(player => {
+        if (player.id === infectedPlayer.id) {
+            player.position = zombieSpawnPoint;
+            player.isInfected = true;
+        } else {
+            player.position = spawnPoint;
+            player.isInfected = false;
+        }
+        player.isDead = false;
+    });
+    
+    // Send updated positions to all
+    io.to(roomId).emit('gameStart', {
+        infectedPlayerId: infectedPlayer.id,
+        spawnPoint,
+        zombieSpawnPoint,
+    });
+    
+    broadcastGameState(roomId);
+    console.log(`[${roomId}] Game started! Infected: ${infectedPlayer.nickname}`);
+};
 
-    const alivePlayers = roomPlayers.filter(p => !p.isDead);
-    if (alivePlayers.length === 0) {
-        clearZombiesForRoom(roomId, "all players dead");
+const infectPlayer = (roomId, victimId, attackerId) => {
+    const roomState = roomGameState[roomId];
+    if (!roomState || roomState.state !== 'PLAYING') return;
+    
+    if (roomState.infectedPlayers.includes(victimId)) return; // Already infected
+    if (!roomState.infectedPlayers.includes(attackerId)) return; // Attacker not infected
+    
+    const victim = players[victimId];
+    if (!victim) return;
+    
+    roomState.infectedPlayers.push(victimId);
+    victim.isInfected = true;
+    
+    const room = ROOMS.find(r => r.id === roomId);
+    const zombieSpawnPoint = room?.zombieSpawnPoint || [0, 5, 5];
+    victim.position = zombieSpawnPoint;
+    
+    io.to(roomId).emit('playerInfected', {
+        playerId: victimId,
+        attackerId,
+        zombieSpawnPoint,
+    });
+    
+    broadcastGameState(roomId);
+    console.log(`[${roomId}] ${victim.nickname} was infected by ${players[attackerId]?.nickname}`);
+    
+    // Check if all players are infected
+    const survivors = getSurvivors(roomId);
+    if (survivors.length === 0) {
+        startVoting(roomId);
     }
 };
+
+const startVoting = (roomId) => {
+    const roomState = roomGameState[roomId];
+    if (!roomState) return;
+    
+    roomState.state = 'VOTING';
+    roomState.votes = {};
+    roomState.voteEnd = Date.now() + (VOTE_SECONDS * 1000);
+    
+    io.to(roomId).emit('voteStart', {
+        maps: ROOMS.map(r => ({ id: r.id, name: r.name, mapImage: r.mapImage })),
+        voteEnd: roomState.voteEnd,
+    });
+    
+    broadcastGameState(roomId);
+    console.log(`[${roomId}] Voting started`);
+};
+
+const endVoting = (roomId) => {
+    const roomState = roomGameState[roomId];
+    if (!roomState || roomState.state !== 'VOTING') return;
+    
+    // Count votes
+    const voteCounts = {};
+    Object.values(roomState.votes).forEach(mapId => {
+        voteCounts[mapId] = (voteCounts[mapId] || 0) + 1;
+    });
+    
+    // Find winner (or default to current map)
+    let winningMapId = roomId;
+    let maxVotes = 0;
+    Object.entries(voteCounts).forEach(([mapId, count]) => {
+        if (count > maxVotes) {
+            maxVotes = count;
+            winningMapId = mapId;
+        }
+    });
+    
+    io.to(roomId).emit('voteEnd', { winningMapId });
+    console.log(`[${roomId}] Vote ended. Winner: ${winningMapId}`);
+    
+    // Reset game state for new round
+    roomState.state = 'WAITING';
+    roomState.countdownEnd = null;
+    roomState.infectedPlayers = [];
+    roomState.votes = {};
+    roomState.voteEnd = null;
+    
+    // Reset all players
+    getRoomPlayers(roomId).forEach(player => {
+        player.isInfected = false;
+        player.isDead = false;
+    });
+    
+    broadcastGameState(roomId);
+    
+    // Check if we can start countdown again
+    checkRoomState(roomId);
+};
+
+const checkRoomState = (roomId) => {
+    const roomState = roomGameState[roomId];
+    if (!roomState) return;
+    
+    const roomPlayers = getRoomPlayers(roomId);
+    const playerCount = roomPlayers.length;
+    
+    if (roomState.state === 'WAITING') {
+        if (playerCount >= MIN_PLAYERS) {
+            startCountdown(roomId);
+        }
+    } else if (roomState.state === 'COUNTDOWN') {
+        if (playerCount < MIN_PLAYERS) {
+            cancelCountdown(roomId);
+        }
+    }
+};
+
+// Game loop - check countdowns and votes
+setInterval(() => {
+    const now = Date.now();
+    
+    Object.entries(roomGameState).forEach(([roomId, state]) => {
+        if (state.state === 'COUNTDOWN' && state.countdownEnd && now >= state.countdownEnd) {
+            startGame(roomId);
+        }
+        
+        if (state.state === 'VOTING' && state.voteEnd && now >= state.voteEnd) {
+            endVoting(roomId);
+        }
+    });
+}, 1000);
 
 io.on("connection", (socket) => {
     console.log("New connection:", socket.id);
@@ -96,13 +304,12 @@ io.on("connection", (socket) => {
             console.log("Player disconnected/removed:", socket.id);
             const roomId = player.roomId;
             delete players[socket.id];
-            delete lastSpawnBySocket[socket.id];
             io.to(roomId).emit("playerDisconnected", socket.id);
-            evaluateRoomState(roomId);
+            checkRoomState(roomId);
+            broadcastGameState(roomId);
         }
     };
 
-    // Send available rooms and their current player counts
     socket.on("getRooms", () => {
         const roomData = ROOMS.map(room => {
             const count = Object.values(players).filter(p => p.roomId === room.id).length;
@@ -112,39 +319,44 @@ io.on("connection", (socket) => {
     });
 
     socket.on("joinRoom", ({ roomId, nickname }) => {
-        // Validate room
         const room = ROOMS.find(r => r.id === roomId);
         if (!room) {
             socket.emit("error", "Invalid room");
             return;
         }
 
-        // Join the socket.io room
         socket.join(roomId);
 
-        // Assign character index sequentially
+        // Initialize room state if needed
+        if (!roomGameState[roomId]) {
+            roomGameState[roomId] = getInitialRoomState();
+        }
+
         const assignedCharacterIndex = nextCharacterIndex;
         nextCharacterIndex++;
         if (nextCharacterIndex > 5) {
             nextCharacterIndex = 1;
         }
 
-        // Create player object
+        const roomState = roomGameState[roomId];
+        const isSpectator = roomState.state === 'PLAYING';
+
         players[socket.id] = {
             id: socket.id,
             roomId: roomId,
-            position: [0, 0, -1],
+            position: room.spawnPoint,
             quaternion: [0, 0, 0, 1],
             isMoving: false,
             isRunning: false,
             isDead: false,
+            isInfected: false,
+            isSpectator,
             characterIndex: assignedCharacterIndex,
             isSpeaking: false,
             nickname: nickname || "Player",
             lastSeen: Date.now()
         };
 
-        // Get all players in THIS room
         const roomPlayers = {};
         Object.values(players).forEach(p => {
             if (p.roomId === roomId) {
@@ -152,32 +364,32 @@ io.on("connection", (socket) => {
             }
         });
 
-        // Send current players in this room to the new player
         socket.emit("currentPlayers", roomPlayers);
-
-        // Send existing zombies in this room
-        const zombies = roomZombies[roomId] || [];
-        socket.emit("currentZombies", zombies);
-
-        // Broadcast new player to everyone else in the room
+        socket.emit("joinedRoom", { 
+            roomId, 
+            isSpectator,
+            gameState: roomState.state,
+            infectedPlayers: roomState.infectedPlayers,
+        });
+        
         socket.to(roomId).emit("newPlayer", players[socket.id]);
 
-        console.log(`Player ${socket.id} joined room ${roomId} as ${players[socket.id].nickname}`);
+        console.log(`Player ${socket.id} joined room ${roomId} as ${players[socket.id].nickname}${isSpectator ? ' (spectator)' : ''}`);
+        
+        checkRoomState(roomId);
+        broadcastGameState(roomId);
     });
 
-    // Player explicitly leaves the room (e.g., back to menu)
     socket.on("leaveRoom", () => {
         removePlayer();
         socket.leaveAll();
     });
 
-    // Heartbeat to keep player alive even when standing still
     socket.on("heartbeat", () => touchPlayer());
 
-    // Handle player movement
     socket.on("playerMove", (data) => {
         const player = players[socket.id];
-        if (player && !player.isDead) {
+        if (player && !player.isSpectator) {
             touchPlayer();
             player.position = data.position;
             player.quaternion = data.quaternion;
@@ -191,44 +403,56 @@ io.on("connection", (socket) => {
                 isMoving: data.isMoving,
                 isRunning: data.isRunning,
                 characterIndex: player.characterIndex,
-                isSpeaking: player.isSpeaking
+                isSpeaking: player.isSpeaking,
+                isInfected: player.isInfected,
             });
         }
     });
 
-    socket.on("playerDead", () => {
-        const player = players[socket.id];
-        if (!player || player.isDead) return;
-        player.isDead = true;
-        io.to(player.roomId).emit("updatePlayerState", player);
-        evaluateRoomState(player.roomId);
-    });
-
-    // Spawn zombie for the player's current room
-    socket.on("spawnZombie", () => {
-        const player = players[socket.id];
-        if (!player || player.isDead) return;
-        const now = Date.now();
-        const last = lastSpawnBySocket[socket.id] || 0;
-        if (now - last < ZOMBIE_COOLDOWN_MS) {
-            return; // spam guard
+    socket.on("attack", ({ targetId }) => {
+        const attacker = players[socket.id];
+        if (!attacker || !attacker.isInfected) return;
+        
+        const roomState = roomGameState[attacker.roomId];
+        if (!roomState || roomState.state !== 'PLAYING') return;
+        
+        const target = players[targetId];
+        if (!target || target.roomId !== attacker.roomId) return;
+        if (roomState.infectedPlayers.includes(targetId)) return; // Already infected
+        
+        // Check distance
+        const dx = attacker.position[0] - target.position[0];
+        const dy = attacker.position[1] - target.position[1];
+        const dz = attacker.position[2] - target.position[2];
+        const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        
+        if (distance <= ATTACK_RANGE) {
+            infectPlayer(attacker.roomId, targetId, socket.id);
         }
-        lastSpawnBySocket[socket.id] = now;
-        const room = ROOMS.find(r => r.id === player.roomId);
-        const spawnPoint = room?.zombieSpawnPoint || room?.spawnPoint || [0, 2, 0];
-        const zombie = {
-            id: `z-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            spawnPoint
-        };
-        if (!roomZombies[player.roomId]) roomZombies[player.roomId] = [];
-        roomZombies[player.roomId].push(zombie);
-        io.to(player.roomId).emit("zombieSpawned", zombie);
-        console.log(`Zombie spawned in ${player.roomId} by ${socket.id} @`, spawnPoint);
     });
 
-    // Handle WebRTC Signaling
+    socket.on("vote", ({ mapId }) => {
+        const player = players[socket.id];
+        if (!player) return;
+        
+        const roomState = roomGameState[player.roomId];
+        if (!roomState || roomState.state !== 'VOTING') return;
+        
+        // Validate map exists
+        if (!ROOMS.find(r => r.id === mapId)) return;
+        
+        roomState.votes[socket.id] = mapId;
+        
+        // Broadcast vote update
+        const voteCounts = {};
+        Object.values(roomState.votes).forEach(id => {
+            voteCounts[id] = (voteCounts[id] || 0) + 1;
+        });
+        
+        io.to(player.roomId).emit("voteUpdate", { votes: voteCounts });
+    });
+
     socket.on("signal", (data) => {
-        // Ensure target is in the same room (optional security, but good practice)
         const sender = players[socket.id];
         const target = players[data.target];
 
@@ -240,7 +464,6 @@ io.on("connection", (socket) => {
         }
     });
 
-    // Handle Speaking State
     socket.on("speaking", (isSpeaking) => {
         const player = players[socket.id];
         if (player) {
@@ -252,7 +475,6 @@ io.on("connection", (socket) => {
         }
     });
 
-    // Handle Chat Messages
     socket.on("chatMessage", (text) => {
         const player = players[socket.id];
         if (player) {
@@ -263,18 +485,16 @@ io.on("connection", (socket) => {
                 text: text,
                 timestamp: Date.now()
             };
-            // Broadcast to room only
             io.to(player.roomId).emit("chatMessage", message);
         }
     });
 
-    // Handle disconnect
     socket.on("disconnect", () => {
         removePlayer();
     });
 });
 
-// Periodically purge stale connections that never sent a disconnect
+// Purge stale connections
 setInterval(() => {
     const now = Date.now();
     Object.entries(players).forEach(([id, player]) => {
@@ -283,7 +503,8 @@ setInterval(() => {
             const roomId = player.roomId;
             delete players[id];
             io.to(roomId).emit("playerDisconnected", id);
-            evaluateRoomState(roomId);
+            checkRoomState(roomId);
+            broadcastGameState(roomId);
         }
     });
 }, 5000);

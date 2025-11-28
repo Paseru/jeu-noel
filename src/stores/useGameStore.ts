@@ -11,6 +11,8 @@ interface PlayerState {
     isSpeaking?: boolean
     characterIndex: number
     isDead?: boolean
+    isInfected?: boolean
+    isSpectator?: boolean
 }
 
 interface MobileInputState {
@@ -39,36 +41,38 @@ interface Room {
     scale?: number
     spawnPoint?: [number, number, number]
     zombieSpawnPoint?: [number, number, number]
-    summonPoint?: [number, number, number]
 }
 
-interface GatherState {
-    status: 'idle' | 'countdown'
-    countdownMs: number | null
-    inside: number
-    alive: number
-    total: number
-}
-
-const createInitialGatherState = (): GatherState => ({
-    status: 'idle',
-    countdownMs: null,
-    inside: 0,
-    alive: 0,
-    total: 0
-})
-
-interface Zombie {
+interface MapVoteOption {
     id: string
-    spawnPoint: [number, number, number]
+    name: string
+    mapImage: string
 }
+
+type InfectedGameState = 'WAITING' | 'COUNTDOWN' | 'PLAYING' | 'VOTING'
 
 interface GameState {
     phase: 'MENU' | 'PLAYING'
     setPhase: (phase: 'MENU' | 'PLAYING') => void
     socket: Socket | null
     players: Record<string, PlayerState>
-    zombies: Zombie[]
+    
+    // Infected mode state
+    infectedGameState: InfectedGameState
+    countdownEnd: number | null
+    infectedPlayers: string[]
+    isInfected: boolean
+    isSpectator: boolean
+    spectatingPlayerId: string | null
+    survivorCount: number
+    minPlayers: number
+    
+    // Voting
+    voteOptions: MapVoteOption[]
+    votes: Record<string, number>
+    voteEnd: number | null
+    myVote: string | null
+    
     isPlayerDead: boolean
     setPlayerDead: (dead: boolean) => void
     movementLocked: boolean
@@ -86,7 +90,6 @@ interface GameState {
     messages: ChatMessage[]
     rooms: Room[]
     currentRoomId: string | null
-    roundActive: boolean
 
     playerId: string | null
     nickname: string
@@ -123,19 +126,25 @@ interface GameState {
     fetchRooms: () => void
     joinRoom: (roomId: string) => void
     leaveRoom: () => void
-    spawnZombie: () => void
+    
+    // Attack (for infected players)
+    attack: (targetId: string) => void
+    
+    // Vote
+    vote: (mapId: string) => void
+    
+    // Spectator
+    setSpectatingPlayer: (playerId: string | null) => void
+    nextSpectatorTarget: () => void
+    prevSpectatorTarget: () => void
 
     updatePlayer: (id: string, position: [number, number, number], quaternion: [number, number, number, number]) => void
     addPlayer: (player: PlayerState) => void
     removePlayer: (id: string) => void
     setPlayers: (players: Record<string, PlayerState>) => void
-    setZombies: (zombies: Zombie[]) => void
-    addZombie: (zombie: Zombie) => void
-    clearZombies: () => void
     sendMessage: (text: string) => void
     addChatMessage: (message: ChatMessage) => void
 
-    // Local player transform (kept client-side so AI can target self)
     setLocalPlayerTransform: (
         position: [number, number, number],
         quaternion: [number, number, number, number],
@@ -146,12 +155,6 @@ interface GameState {
     // Interaction System
     interactionText: string | null
     setInteractionText: (text: string | null) => void
-
-    // Gather / Summon Zone state for UI
-    gather: GatherState
-    setGatherState: (state: Partial<GatherState>) => void
-    resetGatherState: () => void
-    setRoundActive: (active: boolean) => void
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -159,17 +162,28 @@ export const useGameStore = create<GameState>((set, get) => ({
     setPhase: (phase) => set({ phase }),
     socket: null,
     players: {},
-    zombies: [],
+    
+    // Infected mode defaults
+    infectedGameState: 'WAITING',
+    countdownEnd: null,
+    infectedPlayers: [],
+    isInfected: false,
+    isSpectator: false,
+    spectatingPlayerId: null,
+    survivorCount: 0,
+    minPlayers: 3,
+    
+    // Voting defaults
+    voteOptions: [],
+    votes: {},
+    voteEnd: null,
+    myVote: null,
+    
     isPlayerDead: false,
     setPlayerDead: (dead) => {
-        const socket = get().socket
-        const playerId = get().playerId
-        if (dead && socket) {
-            socket.emit('playerDead')
-        }
-
         set((state) => {
             const players = { ...state.players }
+            const playerId = state.playerId
             if (playerId && players[playerId]) {
                 players[playerId] = { ...players[playerId], isDead: dead }
             }
@@ -211,14 +225,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     messages: [],
     rooms: [],
     currentRoomId: null,
-    roundActive: false,
     playerId: null,
     nickname: '',
     isChatOpen: false,
 
-    // Default Volumes
     volumes: {
-        music: 0.01, // Default low music
+        music: 0.01,
         voice: 1.0,
         sfx: 0.5
     },
@@ -260,7 +272,6 @@ export const useGameStore = create<GameState>((set, get) => ({
         mobileInput: { ...state.mobileInput, isRunning }
     })),
 
-    // My Character Index (Assigned by Server)
     myCharacterIndex: 1,
     setMyCharacterIndex: (index) => set({ myCharacterIndex: index }),
 
@@ -273,7 +284,6 @@ export const useGameStore = create<GameState>((set, get) => ({
         }
     },
 
-    // Debug Mode
     isDebugMode: false,
     toggleDebugMode: () => set((state) => ({ isDebugMode: !state.isDebugMode })),
 
@@ -304,6 +314,16 @@ export const useGameStore = create<GameState>((set, get) => ({
                 return { players }
             })
         })
+        
+        socket.on('joinedRoom', ({ isSpectator, gameState, infectedPlayers }) => {
+            const playerId = get().playerId
+            set({
+                isSpectator,
+                infectedGameState: gameState,
+                infectedPlayers,
+                isInfected: playerId ? infectedPlayers.includes(playerId) : false,
+            })
+        })
 
         socket.on('newPlayer', (player) => {
             set((state) => {
@@ -315,7 +335,7 @@ export const useGameStore = create<GameState>((set, get) => ({
             })
         })
 
-        socket.on('playerMoved', ({ id, position, quaternion, isMoving, isRunning }) => {
+        socket.on('playerMoved', ({ id, position, quaternion, isMoving, isRunning, isInfected }) => {
             set((state) => {
                 if (!state.players[id]) return state
                 return {
@@ -326,7 +346,8 @@ export const useGameStore = create<GameState>((set, get) => ({
                             position,
                             quaternion,
                             isMoving,
-                            isRunning
+                            isRunning,
+                            isInfected
                         }
                     }
                 }
@@ -353,16 +374,72 @@ export const useGameStore = create<GameState>((set, get) => ({
             }))
         })
 
-        socket.on('currentZombies', (zombies: Zombie[]) => {
-            set({ zombies, roundActive: zombies.length > 0 })
+        socket.on('gameStateUpdate', ({ state: gameState, countdownEnd, infectedPlayers, survivorCount, minPlayers }) => {
+            const playerId = get().playerId
+            set({
+                infectedGameState: gameState,
+                countdownEnd,
+                infectedPlayers,
+                survivorCount,
+                minPlayers,
+                isInfected: playerId ? infectedPlayers.includes(playerId) : false,
+            })
         })
-
-        socket.on('zombieSpawned', (zombie: Zombie) => {
-            set((state) => ({ zombies: [...state.zombies, zombie], roundActive: true }))
+        
+        socket.on('gameStart', ({ infectedPlayerId }) => {
+            const playerId = get().playerId
+            const isInfected = playerId === infectedPlayerId
+            set({
+                infectedGameState: 'PLAYING',
+                isInfected,
+                infectedPlayers: [infectedPlayerId],
+            })
+            console.log(`Game started! You are ${isInfected ? 'INFECTED' : 'a SURVIVOR'}`)
         })
-
-        socket.on('zombiesCleared', () => {
-            set({ zombies: [], roundActive: false, gather: createInitialGatherState() })
+        
+        socket.on('playerInfected', ({ playerId: victimId }) => {
+            const myId = get().playerId
+            set((state) => {
+                const newInfected = state.infectedPlayers.includes(victimId) 
+                    ? state.infectedPlayers 
+                    : [...state.infectedPlayers, victimId]
+                return {
+                    infectedPlayers: newInfected,
+                    isInfected: myId === victimId ? true : state.isInfected,
+                    survivorCount: Object.keys(state.players).length - newInfected.length,
+                }
+            })
+            if (myId === victimId) {
+                console.log('You have been INFECTED!')
+            }
+        })
+        
+        socket.on('voteStart', ({ maps, voteEnd }) => {
+            set({
+                infectedGameState: 'VOTING',
+                voteOptions: maps,
+                voteEnd,
+                votes: {},
+                myVote: null,
+            })
+        })
+        
+        socket.on('voteUpdate', ({ votes }) => {
+            set({ votes })
+        })
+        
+        socket.on('voteEnd', ({ winningMapId }) => {
+            console.log('Vote ended, next map:', winningMapId)
+            set({
+                infectedGameState: 'WAITING',
+                voteOptions: [],
+                votes: {},
+                voteEnd: null,
+                myVote: null,
+                infectedPlayers: [],
+                isInfected: false,
+                isSpectator: false,
+            })
         })
 
         socket.on('playerSpeaking', ({ id, isSpeaking }) => {
@@ -395,9 +472,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         if (socket) {
             socket.emit('getRooms')
         } else {
-            // Ensure socket is connected first
             get().connectSocket()
-            // Wait a bit for connection (simple hack, or rely on auto-reconnect logic)
             setTimeout(() => {
                 get().socket?.emit('getRooms')
             }, 500)
@@ -413,10 +488,11 @@ export const useGameStore = create<GameState>((set, get) => ({
                 currentRoomId: roomId,
                 isPlayerDead: false,
                 mapLoaded: false,
-                zombies: [],
-                roundActive: false,
-                gather: createInitialGatherState(),
-                killCamTarget: null
+                killCamTarget: null,
+                infectedGameState: 'WAITING',
+                infectedPlayers: [],
+                isInfected: false,
+                isSpectator: false,
             })
         }
     },
@@ -431,37 +507,61 @@ export const useGameStore = create<GameState>((set, get) => ({
             phase: 'MENU',
             currentRoomId: null,
             players: {},
-            zombies: [],
             isPlayerDead: false,
             mapLoaded: false,
             socket: null,
             playerId: null,
-            roundActive: false,
-            gather: createInitialGatherState(),
             movementLocked: false,
             movementLockSources: [],
             cameraForceSources: [],
             forcedCameraMode: null,
-            killCamTarget: null
+            killCamTarget: null,
+            infectedGameState: 'WAITING',
+            infectedPlayers: [],
+            isInfected: false,
+            isSpectator: false,
+            spectatingPlayerId: null,
+            voteOptions: [],
+            votes: {},
+            voteEnd: null,
+            myVote: null,
         })
     },
 
-    spawnZombie: () => {
+    attack: (targetId: string) => {
         const socket = get().socket
-        const roomId = get().currentRoomId
-        const isPlayerDead = get().isPlayerDead
-        if (isPlayerDead) {
-            console.warn('[spawnZombie] ignored: player is dead')
-            return
-        }
-        if (!roomId) {
-            console.warn('[spawnZombie] ignored: no room joined')
-            return
-        }
-        if (socket) {
-            console.log('[spawnZombie] request for room', roomId)
-            socket.emit('spawnZombie')
-        }
+        const isInfected = get().isInfected
+        if (!socket || !isInfected) return
+        socket.emit('attack', { targetId })
+    },
+    
+    vote: (mapId: string) => {
+        const socket = get().socket
+        if (!socket) return
+        socket.emit('vote', { mapId })
+        set({ myVote: mapId })
+    },
+    
+    setSpectatingPlayer: (playerId) => set({ spectatingPlayerId: playerId }),
+    
+    nextSpectatorTarget: () => {
+        const { players, spectatingPlayerId, playerId: myId } = get()
+        const playerIds = Object.keys(players).filter(id => id !== myId)
+        if (playerIds.length === 0) return
+        
+        const currentIndex = spectatingPlayerId ? playerIds.indexOf(spectatingPlayerId) : -1
+        const nextIndex = (currentIndex + 1) % playerIds.length
+        set({ spectatingPlayerId: playerIds[nextIndex] })
+    },
+    
+    prevSpectatorTarget: () => {
+        const { players, spectatingPlayerId, playerId: myId } = get()
+        const playerIds = Object.keys(players).filter(id => id !== myId)
+        if (playerIds.length === 0) return
+        
+        const currentIndex = spectatingPlayerId ? playerIds.indexOf(spectatingPlayerId) : 0
+        const prevIndex = (currentIndex - 1 + playerIds.length) % playerIds.length
+        set({ spectatingPlayerId: playerIds[prevIndex] })
     },
 
     sendMessage: (text: string) => {
@@ -475,9 +575,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         messages: [...state.messages, message]
     })),
 
-    updatePlayer: (_id, _position, _quaternion) => {
-        // This is for local updates if needed, but mostly handled by socket events
-    },
+    updatePlayer: (_id, _position, _quaternion) => {},
 
     addPlayer: (player) => set((state) => ({ players: { ...state.players, [player.id]: player } })),
     removePlayer: (id) => set((state) => {
@@ -485,12 +583,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         return { players: rest }
     }),
     setPlayers: (players) => set({ players }),
-    setZombies: (zombies) => set({ zombies, roundActive: zombies.length > 0 }),
-    addZombie: (zombie) => set((state) => ({ zombies: [...state.zombies, zombie], roundActive: true })),
-    clearZombies: () => set({ zombies: [], roundActive: false, gather: createInitialGatherState() }),
 
     setLocalPlayerTransform: (position, quaternion, isMoving, isRunning) => set((state) => {
-        const { playerId, nickname, myCharacterIndex, phase, currentRoomId } = state
+        const { playerId, nickname, myCharacterIndex, phase, currentRoomId, isInfected } = state
         if (!playerId || phase !== 'PLAYING' || !currentRoomId) return state
         const existing = state.players[playerId]
         return {
@@ -505,36 +600,13 @@ export const useGameStore = create<GameState>((set, get) => ({
                     isRunning,
                     nickname: existing?.nickname || nickname || 'Player',
                     isSpeaking: existing?.isSpeaking || false,
-                    characterIndex: existing?.characterIndex || myCharacterIndex
+                    characterIndex: existing?.characterIndex || myCharacterIndex,
+                    isInfected,
                 }
             }
         }
     }),
 
-    // Interaction System
     interactionText: null,
     setInteractionText: (text) => set({ interactionText: text }),
-
-    // Gather / Summon state (shared with UI)
-    gather: {
-        ...createInitialGatherState()
-    },
-    setGatherState: (state) => set((current) => {
-        const next = { ...current.gather, ...state }
-        if (
-            next.status === current.gather.status &&
-            next.countdownMs === current.gather.countdownMs &&
-            next.inside === current.gather.inside &&
-            next.alive === current.gather.alive &&
-            next.total === current.gather.total
-        ) {
-            return current
-        }
-        return { gather: next }
-    }),
-    resetGatherState: () => set({
-        gather: createInitialGatherState()
-    }),
-
-    setRoundActive: (active) => set({ roundActive: active })
 }))

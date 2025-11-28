@@ -15,7 +15,9 @@ import { InteractionPrompt } from './UI/InteractionPrompt'
 import PlayerList from './UI/PlayerList'
 import { DeathScreen } from './UI/DeathScreen'
 import Loader from './UI/Loader'
-import SummonHud from './UI/SummonHud'
+import GameStatusHud from './UI/GameStatusHud'
+import VoteScreen from './UI/VoteScreen'
+import SpectatorHud from './UI/SpectatorHud'
 
 export default function App() {
     const map = useMemo(() => [
@@ -220,7 +222,8 @@ export default function App() {
                     <Chat />
                     <VoiceChatManager />
                     <VoiceIndicator />
-                    <SummonHud />
+                    <GameStatusHud />
+                    <SpectatorHud />
                     {!isSettingsOpen && !isPauseMenuOpen && !isPlayerListOpen && (
                         <MobileControls onOpenMenu={() => setIsPauseMenuOpen(true)} />
                     )}
@@ -238,6 +241,9 @@ export default function App() {
                             onQuit={handleQuit}
                         />
                     )}
+                    
+                    {/* Vote Screen */}
+                    <VoteScreen />
                 </>
             )}
 

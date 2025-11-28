@@ -154,19 +154,33 @@ export default function VoiceChatManager() {
         })
     }, [players, playerId, socket])
 
-    // Handle Muting
+    // Handle Muting + Infected isolation (zombies can't hear survivors and vice versa)
     const mutedPlayers = useVoiceStore((state) => state.mutedPlayers)
     const remoteStreams = useVoiceStore((state) => state.remoteStreams)
+    const isInfected = useGameStore((state) => state.isInfected)
+    const infectedPlayers = useGameStore((state) => state.infectedPlayers)
+    const infectedGameState = useGameStore((state) => state.infectedGameState)
 
     useEffect(() => {
         Object.keys(remoteStreams).forEach((id) => {
             const stream = remoteStreams[id]
             const isMuted = mutedPlayers[id]
+            
+            // Infected isolation: during PLAYING, zombies and survivors can't hear each other
+            let isIsolated = false
+            if (infectedGameState === 'PLAYING') {
+                const targetIsInfected = infectedPlayers.includes(id)
+                // If I'm infected and target is not, or I'm not infected and target is -> isolate
+                if (isInfected !== targetIsInfected) {
+                    isIsolated = true
+                }
+            }
+            
             stream.getAudioTracks().forEach((track) => {
-                track.enabled = !isMuted
+                track.enabled = !isMuted && !isIsolated
             })
         })
-    }, [mutedPlayers, remoteStreams])
+    }, [mutedPlayers, remoteStreams, isInfected, infectedPlayers, infectedGameState])
 
     // Ensure all peers carry the current microphone tracks (added even if peers were created before mic was ready)
     useEffect(() => {

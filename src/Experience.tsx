@@ -6,14 +6,13 @@ import { Environment } from './World/Environment'
 import { Map } from './World/Map'
 import { Snow } from './World/Snow'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { ZombieManager } from './Enemies/ZombieManager'
-import { ZombieSummonZone } from './Enemies/ZombieSummonZone'
+import SpectatorController from './components/SpectatorController'
 
 import { useGameStore } from './stores/useGameStore'
 import RemotePlayer from './Multiplayer/RemotePlayer'
 
 export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
-    const { players, playerId, isDebugMode } = useGameStore()
+    const { players, playerId, isDebugMode, isSpectator, infectedPlayers } = useGameStore()
 
     return (
         <>
@@ -39,17 +38,16 @@ export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
                     </Suspense>
                 </ErrorBoundary>
 
-                <ZombieSummonZone />
-
-                <PlayerController isSettingsOpen={isSettingsOpen} />
-
-                {/* Zombies */}
-                <ZombieManager />
+                {/* Player controller - hidden for spectators */}
+                {!isSpectator && <PlayerController isSettingsOpen={isSettingsOpen} />}
+                
+                {/* Spectator camera controller */}
+                {isSpectator && <SpectatorController />}
 
                 {/* Remote Players */}
                 <Suspense fallback={null}>
                     {Object.values(players).map((player) => {
-                        if (playerId && player.id === playerId) return null
+                        if (playerId && player.id === playerId && !isSpectator) return null
                         return (
                             <RemotePlayer
                                 key={player.id}
@@ -61,6 +59,7 @@ export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
                                 characterIndex={player.characterIndex}
                                 nickname={player.nickname}
                                 isSpeaking={player.isSpeaking}
+                                isInfected={infectedPlayers.includes(player.id)}
                             />
                         )
                     })}

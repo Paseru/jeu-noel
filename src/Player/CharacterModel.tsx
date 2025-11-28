@@ -15,6 +15,7 @@ interface CharacterModelProps {
     isSpeaking?: boolean
     playerId?: string
     showNameplate?: boolean
+    isInfected?: boolean
 }
 
 export default function CharacterModel({
@@ -24,13 +25,19 @@ export default function CharacterModel({
     nickname = "Player",
     isSpeaking = false,
     playerId,
-    showNameplate = true
+    showNameplate = true,
+    isInfected = false
 }: CharacterModelProps) {
     const group = useRef<Group>(null)
     const phase = useGameStore((state) => state.phase)
     const currentRoomId = useGameStore((state) => state.currentRoomId)
     const isPlayerDead = useGameStore((state) => state.isPlayerDead)
-    const { scene, animations } = useGLTF(`/models/characters/character_${characterIndex}.glb`)
+    
+    // Use zombie model if infected, otherwise use character model
+    const modelPath = isInfected 
+        ? '/models/zombies/terror_engine_-_psycho_zombie.glb'
+        : `/models/characters/character_${characterIndex}.glb`
+    const { scene, animations } = useGLTF(modelPath)
 
     // Clone scene for multiple instances
     const cloneScene = useMemo(() => clone(scene), [scene])

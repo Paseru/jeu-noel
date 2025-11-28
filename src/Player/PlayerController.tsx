@@ -25,6 +25,13 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     const body = useRef<RapierRigidBody>(null!)
     const [subscribeKeys, getKeys] = useKeyboardControls()
     const { camera, scene } = useThree()
+    
+    // Infected mode
+    const isInfected = useGameStore((state) => state.isInfected)
+    const infectedGameState = useGameStore((state) => state.infectedGameState)
+    const players = useGameStore((state) => state.players)
+    const attack = useGameStore((state) => state.attack)
+    const playerId = useGameStore((state) => state.playerId)
 
     // Reference to the character mesh group for rotation
     const characterRef = useRef<THREE.Group>(null)
@@ -148,6 +155,54 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
 
     // Jump Logic
     const lastJumpTime = useRef(0)
+    
+    // Attack cooldown for infected players
+    const lastAttackTime = useRef(0)
+    
+    // Handle click to attack (for infected players)
+    useEffect(() => {
+        if (!isInfected || infectedGameState !== 'PLAYING') return
+        
+        const handleClick = () => {
+            const now = Date.now()
+            if (now - lastAttackTime.current < 500) return // 500ms cooldown
+            lastAttackTime.current = now
+            
+            if (!body.current || !playerId) return
+            
+            const myPos = body.current.translation()
+            const myPosition: [number, number, number] = [myPos.x, myPos.y, myPos.z]
+            
+            // Find nearest non-infected player within attack range
+            let nearestId: string | null = null
+            let nearestDist = Infinity
+            
+            const infectedPlayers = useGameStore.getState().infectedPlayers
+            
+            Object.values(players).forEach((player) => {
+                if (player.id === playerId) return
+                if (infectedPlayers.includes(player.id)) return
+                
+                const dx = player.position[0] - myPosition[0]
+                const dy = player.position[1] - myPosition[1]
+                const dz = player.position[2] - myPosition[2]
+                const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
+                
+                if (dist < nearestDist && dist <= 1.5) { // 1.5m range on client, server checks 1m
+                    nearestDist = dist
+                    nearestId = player.id
+                }
+            })
+            
+            if (nearestId) {
+                console.log('Attacking player:', nearestId)
+                attack(nearestId)
+            }
+        }
+        
+        window.addEventListener('click', handleClick)
+        return () => window.removeEventListener('click', handleClick)
+    }, [isInfected, infectedGameState, players, playerId, attack])
 
     useFrame((_state, delta) => {
         if (!body.current) return
