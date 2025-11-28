@@ -9,36 +9,21 @@ import { useCollisionStore } from '../stores/useCollisionStore'
 // Extend THREE.Mesh to use accelerated raycast
 THREE.Mesh.prototype.raycast = acceleratedRaycast
 
-// Normalize a geometry so BufferGeometryUtils.mergeGeometries can handle it.
-// - Keep only position/normal/uv attributes (BVH only needs positions; normals help if added later)
-// - Add missing normals/uvs with zeros; compute normals when possible.
-// Returns null if no position attribute is present.
+// Normalize geometry for BVH merge: produce a fresh geometry containing only a non-interleaved
+// position attribute. BVH only needs positions, so dropping normals/uvs avoids merge issues
+// with interleaved/extra attributes. Returns null if no position.
 const sanitizeGeometry = (geometry: THREE.BufferGeometry): THREE.BufferGeometry | null => {
-    const geo = geometry.clone()
-    const position = geo.getAttribute('position')
-    if (!position) return null
+    const posAttr = geometry.getAttribute('position')
+    if (!posAttr) return null
 
-    // Ensure normals
-    if (!geo.getAttribute('normal')) {
-        geo.computeVertexNormals()
-    }
+    // De-interleave if needed
+    const positionArray = new Float32Array(posAttr.count * posAttr.itemSize)
+    ;(posAttr as any).toArray(positionArray)
+    const position = new THREE.BufferAttribute(positionArray, posAttr.itemSize)
 
-    // Ensure UVs (required for mergeGeometries matching attribute sets)
-    if (!geo.getAttribute('uv')) {
-        const uvArray = new Float32Array(position.count * 2)
-        geo.setAttribute('uv', new THREE.BufferAttribute(uvArray, 2))
-    }
-
-    // Drop any extra attributes so all geometries share the same set
-    Object.keys(geo.attributes).forEach((name) => {
-        if (name !== 'position' && name !== 'normal' && name !== 'uv') {
-            geo.deleteAttribute(name)
-        }
-    })
-
-    // Clear groups to avoid mismatched groups after merge
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', position)
     geo.clearGroups()
-
     return geo
 }
 
