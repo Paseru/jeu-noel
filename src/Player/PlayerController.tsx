@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { useGameStore } from '../stores/useGameStore'
 import { useVoiceStore } from '../stores/useVoiceStore'
-import { useCollisionStore } from '../stores/useCollisionStore'
+
 import { useRef, useEffect, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useKeyboardControls, PointerLockControls } from '@react-three/drei'
@@ -11,7 +11,6 @@ const SPEED = 3.2
 const RUN_SPEED = 6
 const JUMP_FORCE = 8
 const FLY_SPEED = 15
-const GRAVITY = 20
 
 import CharacterModel from './CharacterModel'
 import { PositionalAudio as ThreePositionalAudio, AudioLoader } from 'three'
@@ -26,13 +25,11 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     const body = useRef<RapierRigidBody>(null!)
     const [subscribeKeys, getKeys] = useKeyboardControls()
     const { camera, scene } = useThree()
-    const fallbackFloorY = useCollisionStore((state) => state.fallbackFloorY)
 
     // Reference to the character mesh group for rotation
     const characterRef = useRef<THREE.Group>(null)
     
-    // Custom gravity velocity
-    const velocityY = useRef(0)
+    // Grounded state for jump
     const isGrounded = useRef(false)
 
     // Head bobbing state
@@ -234,8 +231,8 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
 
         } else {
             // --- NORMAL WALKING LOGIC ---
-            // Disable Rapier gravity - we handle it with BVH
-            body.current.setGravityScale(0, true)
+            // Enable Rapier gravity for trimesh collision
+            body.current.setGravityScale(1, true)
 
             direction
                 .subVectors(frontVector, sideVector)
@@ -243,8 +240,9 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
                 .multiplyScalar(run ? RUN_SPEED : SPEED)
                 .applyEuler(camera.rotation)
 
-            // Only set horizontal velocity - Y is handled by BVH ground detection
-            body.current.setLinvel({ x: direction.x, y: 0, z: direction.z }, true)
+            // Set horizontal velocity, keep current Y velocity for gravity/jump
+            const currentVel = body.current.linvel()
+            body.current.setLinvel({ x: direction.x, y: currentVel.y, z: direction.z }, true)
         }
 
         // Apply Camera Rotation from Touch
@@ -404,30 +402,21 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             run
         )
 
-        // Simple gravity fallback (no BVH collider)
+        // Gravity and jump handled by Rapier physics with trimesh collider
         if (!flyMode) {
-            const pos = body.current.translation()
-            const floorY = fallbackFloorY ?? -1000 // keep well below subway levels
-
-            velocityY.current -= GRAVITY * delta
-            velocityY.current = Math.max(velocityY.current, -50)
-            const newY = pos.y + velocityY.current * delta
-
-            if (newY <= floorY) {
-                body.current.setTranslation({ x: pos.x, y: floorY, z: pos.z }, true)
-                velocityY.current = 0
-                isGrounded.current = true
-                if (jump) {
-                    const now = Date.now()
-                    if (now - lastJumpTime.current > 300) {
-                        velocityY.current = JUMP_FORCE
-                        isGrounded.current = false
-                        lastJumpTime.current = now
-                    }
+            const vel = body.current.linvel()
+            
+            // Check if grounded (small downward velocity means on ground)
+            isGrounded.current = Math.abs(vel.y) < 0.5
+            
+            // Jump
+            if (jump && isGrounded.current) {
+                const now = Date.now()
+                if (now - lastJumpTime.current > 300) {
+                    body.current.setLinvel({ x: vel.x, y: JUMP_FORCE, z: vel.z }, true)
+                    isGrounded.current = false
+                    lastJumpTime.current = now
                 }
-            } else {
-                body.current.setTranslation({ x: pos.x, y: newY, z: pos.z }, true)
-                isGrounded.current = false
             }
         }
     })

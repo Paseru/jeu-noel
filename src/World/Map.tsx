@@ -3,6 +3,7 @@ import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { useGameStore } from '../stores/useGameStore'
 import { useCollisionStore } from '../stores/useCollisionStore'
+import { RigidBody } from '@react-three/rapier'
 
 const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) => {
     const gltf: any = useGLTF(modelPath)
@@ -11,7 +12,6 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
     const setColliderMesh = useCollisionStore((state) => state.setColliderMesh)
     const setFallbackFloorY = useCollisionStore((state) => state.setFallbackFloorY)
 
-    // Minimal load: no BVH, no collider building
     useEffect(() => {
         if (!scene) return
         setColliderMesh(null)
@@ -25,7 +25,12 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
     }, [scene, setColliderMesh, setFallbackFloorY, setMapLoaded])
 
     if (!scene) return null
-    return <primitive object={scene} scale={scale} />
+    
+    return (
+        <RigidBody type="fixed" colliders="trimesh">
+            <primitive object={scene} scale={scale} />
+        </RigidBody>
+    )
 }
 
 export const Map = () => {
