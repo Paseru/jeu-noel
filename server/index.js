@@ -16,8 +16,8 @@ const ROOMS = [
         mapImage: "/maps/assault.jpg",
         modelPath: "/models/cs_assault.glb",
         maxPlayers: 40,
-        spawnPoint: [0, 5, 0],
-        zombieSpawnPoint: [0, 5, 5],
+        spawnPoint: [34.32, 9.45, -38.86],
+        zombieSpawnPoint: [-3.52, 6.37, 33.50],
         summonPoint: [0, 5, 5]
     },
     {
