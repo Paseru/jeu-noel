@@ -24,10 +24,16 @@ export default function MainMenu({ onOpenSettings }: MainMenuProps) {
             
             // Wait for socket to be connected before joining
             const checkSocket = setInterval(() => {
-                const socket = useGameStore.getState().socket
+                const state = useGameStore.getState()
+                const socket = state.socket
                 if (socket?.connected) {
                     clearInterval(checkSocket)
-                    joinRoom('server-assault')
+                    // Fetch rooms first to populate the list for Loader
+                    socket.emit('getRooms')
+                    // Small delay then join
+                    setTimeout(() => {
+                        joinRoom('server-assault')
+                    }, 100)
                 }
             }, 100)
             

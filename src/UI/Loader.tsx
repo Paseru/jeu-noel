@@ -4,7 +4,22 @@ export default function Loader() {
     const { currentRoomId, rooms } = useGameStore()
     const room = rooms.find(r => r.id === currentRoomId)
 
-    if (!room) return null
+    // Fallback loader if room not found yet
+    if (!room) {
+        return (
+            <div className="absolute inset-0 z-[2000] flex flex-col items-center justify-center bg-black text-white">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-16 h-16 relative">
+                        <div className="absolute inset-0 border-4 border-white/20 rounded-full"></div>
+                        <div className="absolute inset-0 border-4 border-t-white rounded-full animate-spin"></div>
+                    </div>
+                    <p className="text-white/60 font-mono tracking-[0.3em] text-sm animate-pulse">
+                        CONNECTING...
+                    </p>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className="absolute inset-0 z-[2000] flex flex-col items-center justify-center bg-black text-white overflow-hidden">
