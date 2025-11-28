@@ -31,16 +31,6 @@ const ROOMS = [
         summonPoint: [0, 5, 5]
     },
     {
-        id: "server-farm",
-        name: "Farm",
-        mapImage: "/maps/farm.jpg",
-        modelPath: "/models/farm.glb",
-        maxPlayers: 40,
-        spawnPoint: [0, 5, 0],
-        zombieSpawnPoint: [0, 5, 5],
-        summonPoint: [0, 5, 5]
-    },
-    {
         id: "server-carpark",
         name: "Car Park",
         mapImage: "/maps/carpark.jpg",
@@ -55,16 +45,6 @@ const ROOMS = [
         name: "Playboy Mansion",
         mapImage: "/maps/mansion.jpg",
         modelPath: "/models/gm_playboy_mansion.glb",
-        maxPlayers: 40,
-        spawnPoint: [0, 5, 0],
-        zombieSpawnPoint: [0, 5, 5],
-        summonPoint: [0, 5, 5]
-    },
-    {
-        id: "server-village",
-        name: "Snowy Village",
-        mapImage: "/maps/village.jpg",
-        modelPath: "/models/snowy_village__ps1_environment.glb",
         maxPlayers: 40,
         spawnPoint: [0, 5, 0],
         zombieSpawnPoint: [0, 5, 5],
