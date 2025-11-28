@@ -16,9 +16,6 @@ const GRAVITY = 20
 import CharacterModel from './CharacterModel'
 import { PositionalAudio as ThreePositionalAudio, AudioLoader } from 'three'
 
-// Reusable raycaster for ground detection
-const raycaster = new THREE.Raycaster()
-raycaster.firstHitOnly = true
 
 interface PlayerControllerProps {
     isSettingsOpen: boolean
@@ -29,10 +26,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     const body = useRef<RapierRigidBody>(null!)
     const [subscribeKeys, getKeys] = useKeyboardControls()
     const { camera, scene } = useThree()
-    const { colliderMesh, fallbackFloorY } = useCollisionStore((state) => ({
-        colliderMesh: state.colliderMesh,
-        fallbackFloorY: state.fallbackFloorY
-    }))
+    const fallbackFloorY = useCollisionStore((state) => state.fallbackFloorY)
 
     // Reference to the character mesh group for rotation
     const characterRef = useRef<THREE.Group>(null)
@@ -410,85 +404,8 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             run
         )
 
-        // BVH Ground Detection & Custom Gravity (Only when NOT flying)
-        if (!flyMode && colliderMesh) {
-            const pos = body.current.translation()
-            
-            // Raycast down from player feet to find ground below
-            raycaster.set(
-                new THREE.Vector3(pos.x, pos.y + 0.5, pos.z),
-                new THREE.Vector3(0, -1, 0)
-            )
-            raycaster.far = 200
-            
-            const hits = raycaster.intersectObject(colliderMesh, false)
-            
-            // Find the closest ground BELOW the player
-            let groundY: number | null = null
-            for (const hit of hits) {
-                if (hit.point.y <= pos.y + 0.3) {
-                    groundY = hit.point.y
-                    break
-                }
-            }
-            
-            if (groundY !== null) {
-                const distanceToGround = pos.y - groundY
-                
-                // Falling or on ground
-                if (velocityY.current <= 0) {
-                    if (distanceToGround <= 0.2) {
-                        // On ground - snap
-                        isGrounded.current = true
-                        velocityY.current = 0
-                        body.current.setTranslation({ x: pos.x, y: groundY + 0.1, z: pos.z }, true)
-                    } else if (distanceToGround < 3) {
-                        // Close to ground - apply gravity and check
-                        isGrounded.current = false
-                        velocityY.current -= GRAVITY * delta
-                        const newY = pos.y + velocityY.current * delta
-                        if (newY <= groundY + 0.1) {
-                            // Would go through ground - snap
-                            body.current.setTranslation({ x: pos.x, y: groundY + 0.1, z: pos.z }, true)
-                            velocityY.current = 0
-                            isGrounded.current = true
-                        } else {
-                            body.current.setTranslation({ x: pos.x, y: newY, z: pos.z }, true)
-                        }
-                    } else {
-                        // Far from ground - fall
-                        isGrounded.current = false
-                        velocityY.current -= GRAVITY * delta
-                        velocityY.current = Math.max(velocityY.current, -50)
-                        body.current.setTranslation({ x: pos.x, y: pos.y + velocityY.current * delta, z: pos.z }, true)
-                    }
-                } else {
-                    // Rising (jumping)
-                    isGrounded.current = false
-                    velocityY.current -= GRAVITY * delta
-                    body.current.setTranslation({ x: pos.x, y: pos.y + velocityY.current * delta, z: pos.z }, true)
-                }
-            } else {
-                // No ground found below - fall
-                isGrounded.current = false
-                velocityY.current -= GRAVITY * delta
-                velocityY.current = Math.max(velocityY.current, -50)
-                body.current.setTranslation({ x: pos.x, y: pos.y + velocityY.current * delta, z: pos.z }, true)
-            }
-            
-            // Jump Logic
-            if (jump && isGrounded.current) {
-                const now = Date.now()
-                if (now - lastJumpTime.current > 300) {
-                    velocityY.current = JUMP_FORCE
-                    isGrounded.current = false
-                    lastJumpTime.current = now
-                }
-            }
-        }
-        
-        // Fallback: no collider mesh yet, use simple gravity to a safe floor below the map
-        if (!flyMode && !colliderMesh) {
+        // Simple gravity fallback (no BVH collider)
+        if (!flyMode) {
             const pos = body.current.translation()
             const floorY = fallbackFloorY ?? -1000 // keep well below subway levels
 
@@ -501,8 +418,12 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
                 velocityY.current = 0
                 isGrounded.current = true
                 if (jump) {
-                    velocityY.current = JUMP_FORCE
-                    isGrounded.current = false
+                    const now = Date.now()
+                    if (now - lastJumpTime.current > 300) {
+                        velocityY.current = JUMP_FORCE
+                        isGrounded.current = false
+                        lastJumpTime.current = now
+                    }
                 }
             } else {
                 body.current.setTranslation({ x: pos.x, y: newY, z: pos.z }, true)
