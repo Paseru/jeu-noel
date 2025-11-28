@@ -21,10 +21,18 @@ export default function MainMenu({ onOpenSettings }: MainMenuProps) {
             setStoreNickname(nickname)
             localStorage.setItem('nickname', nickname)
             connectSocket()
-            // Join CS Assault directly
-            setTimeout(() => {
-                joinRoom('server-assault')
-            }, 300)
+            
+            // Wait for socket to be connected before joining
+            const checkSocket = setInterval(() => {
+                const socket = useGameStore.getState().socket
+                if (socket?.connected) {
+                    clearInterval(checkSocket)
+                    joinRoom('server-assault')
+                }
+            }, 100)
+            
+            // Safety timeout after 5 seconds
+            setTimeout(() => clearInterval(checkSocket), 5000)
         }
     }
 
