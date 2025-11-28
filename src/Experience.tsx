@@ -12,7 +12,7 @@ import { useGameStore } from './stores/useGameStore'
 import RemotePlayer from './Multiplayer/RemotePlayer'
 
 export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
-    const { players, playerId, isDebugMode, isSpectator, infectedPlayers } = useGameStore()
+    const { players, playerId, isDebugMode, isSpectator, infectedPlayers, playersBeingInfected } = useGameStore()
 
     return (
         <>
@@ -59,7 +59,8 @@ export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
                                 characterIndex={player.characterIndex}
                                 nickname={player.nickname}
                                 isSpeaking={player.isSpeaking}
-                                isInfected={infectedPlayers.includes(player.id)}
+                                isInfected={infectedPlayers.includes(player.id) && !playersBeingInfected.includes(player.id)}
+                                isBeingInfected={playersBeingInfected.includes(player.id)}
                             />
                         )
                     })}

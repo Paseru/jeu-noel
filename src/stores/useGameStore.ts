@@ -82,6 +82,7 @@ interface GameState {
     isBeingInfected: boolean
     infectionTransitionEnd: number | null
     pendingInfectionSpawn: [number, number, number] | null
+    playersBeingInfected: string[]
     clearInfectionTransition: () => void
     
     isPlayerDead: boolean
@@ -199,11 +200,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     isBeingInfected: false,
     infectionTransitionEnd: null,
     pendingInfectionSpawn: null,
-    clearInfectionTransition: () => set({
+    playersBeingInfected: [],
+    clearInfectionTransition: () => set((state) => ({
         isBeingInfected: false,
         infectionTransitionEnd: null,
         pendingInfectionSpawn: null,
-    }),
+        playersBeingInfected: state.playersBeingInfected.filter(id => id !== state.playerId),
+    })),
     
     isPlayerDead: false,
     setPlayerDead: (dead) => {
@@ -448,8 +451,14 @@ export const useGameStore = create<GameState>((set, get) => ({
                     ? state.infectedPlayers 
                     : [...state.infectedPlayers, victimId]
                 
+                // Add to playersBeingInfected for transition delay
+                const newPlayersBeingInfected = state.playersBeingInfected.includes(victimId)
+                    ? state.playersBeingInfected
+                    : [...state.playersBeingInfected, victimId]
+                
                 const baseUpdate = {
                     infectedPlayers: newInfected,
+                    playersBeingInfected: newPlayersBeingInfected,
                     isInfected: isMe ? true : state.isInfected,
                     survivorCount: Object.keys(state.players).length - newInfected.length,
                 }
@@ -466,6 +475,13 @@ export const useGameStore = create<GameState>((set, get) => ({
                 
                 return baseUpdate
             })
+            
+            // Remove from playersBeingInfected after 3 seconds (transition duration)
+            setTimeout(() => {
+                set((state) => ({
+                    playersBeingInfected: state.playersBeingInfected.filter(id => id !== victimId)
+                }))
+            }, 3000)
             
             if (isMe) {
                 console.log('You have been INFECTED! Transitioning...')
@@ -495,6 +511,7 @@ export const useGameStore = create<GameState>((set, get) => ({
                 voteEnd: null,
                 myVote: null,
                 infectedPlayers: [],
+                playersBeingInfected: [],
                 isInfected: false,
                 isSpectator: false,
             })
@@ -576,6 +593,7 @@ export const useGameStore = create<GameState>((set, get) => ({
             killCamTarget: null,
             infectedGameState: 'WAITING',
             infectedPlayers: [],
+            playersBeingInfected: [],
             isInfected: false,
             isSpectator: false,
             spectatingPlayerId: null,

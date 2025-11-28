@@ -17,6 +17,7 @@ interface CharacterModelProps {
     showNameplate?: boolean
     isInfected?: boolean
     isAttacking?: boolean
+    isBeingInfected?: boolean
 }
 
 export default function CharacterModel({
@@ -28,12 +29,14 @@ export default function CharacterModel({
     playerId,
     showNameplate = true,
     isInfected = false,
-    isAttacking = false
+    isAttacking = false,
+    isBeingInfected = false
 }: CharacterModelProps) {
     const group = useRef<Group>(null)
     const phase = useGameStore((state) => state.phase)
     const currentRoomId = useGameStore((state) => state.currentRoomId)
     const isPlayerDead = useGameStore((state) => state.isPlayerDead)
+    const localIsInfected = useGameStore((state) => state.isInfected)
     
     // Use zombie model if infected, otherwise use character model
     const modelPath = isInfected 
@@ -92,6 +95,37 @@ export default function CharacterModel({
             }
         }
     }, [playerId, stream, audioListener, voiceVolume])
+
+    // Death sound when player gets infected
+    const sfxVolume = useGameStore((state) => state.volumes.sfx)
+    const wasBeingInfectedRef = useRef(false)
+    
+    useEffect(() => {
+        // Play death sound when isBeingInfected changes from false to true
+        if (isBeingInfected && !wasBeingInfectedRef.current && audioListener && group.current) {
+            const loader = new THREE.AudioLoader()
+            loader.load('/sounds/player/death/agonie.mp3', (buffer) => {
+                const sound = new ThreePositionalAudio(audioListener)
+                sound.setBuffer(buffer)
+                sound.setRefDistance(2)
+                sound.setMaxDistance(30)
+                sound.setRolloffFactor(1)
+                sound.setDistanceModel('linear')
+                sound.setVolume(sfxVolume)
+                
+                // Add sound to character group so it plays at their position
+                group.current?.add(sound)
+                sound.play()
+                
+                // Remove sound after it finishes
+                sound.onEnded = () => {
+                    group.current?.remove(sound)
+                    sound.disconnect()
+                }
+            })
+        }
+        wasBeingInfectedRef.current = isBeingInfected
+    }, [isBeingInfected, audioListener, sfxVolume])
 
     // Smooth action switching to avoid momentary T-poses on key press
     const activeActionRef = useRef<THREE.AnimationAction | null>(null)
@@ -216,8 +250,8 @@ export default function CharacterModel({
                 <primitive object={cloneScene} />
             </group>
 
-            {/* Nameplate - Only visible when playing AND showNameplate is true AND within distance */}
-            {phase === 'PLAYING' && showNameplate && isNameplateVisible && (
+            {/* Nameplate - Only visible when playing AND showNameplate is true AND within distance AND same team */}
+            {phase === 'PLAYING' && showNameplate && isNameplateVisible && isInfected === localIsInfected && (
                 <Html position={[0, 2.2, 0]} center distanceFactor={10} zIndexRange={[0, 10]}>
                     <div className="flex items-center justify-center">
                         <div className="bg-black/50 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-2">

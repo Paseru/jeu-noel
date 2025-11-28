@@ -13,6 +13,7 @@ interface RemotePlayerProps {
     nickname?: string
     isSpeaking?: boolean
     isInfected?: boolean
+    isBeingInfected?: boolean
 }
 
 export default function RemotePlayer({
@@ -24,7 +25,8 @@ export default function RemotePlayer({
     characterIndex = 1,
     nickname,
     isSpeaking,
-    isInfected = false
+    isInfected = false,
+    isBeingInfected = false
 }: RemotePlayerProps) {
     const group = useRef<any>()
 
@@ -52,6 +54,7 @@ export default function RemotePlayer({
                     isSpeaking={isSpeaking}
                     playerId={id}
                     isInfected={isInfected}
+                    isBeingInfected={isBeingInfected}
                 />
             </group>
         </group>
