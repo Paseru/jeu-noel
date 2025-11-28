@@ -419,7 +419,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
                 new THREE.Vector3(pos.x, pos.y + 0.5, pos.z),
                 new THREE.Vector3(0, -1, 0)
             )
-            raycaster.far = 50
+            raycaster.far = 200
             
             const hits = raycaster.intersectObject(colliderMesh, false)
             

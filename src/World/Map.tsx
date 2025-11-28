@@ -53,6 +53,24 @@ const MapContent = ({ modelPath, scale }: { modelPath: string, scale: number }) 
             scene.updateMatrixWorld(true)
 
             scene.traverse((child) => {
+                // Handle instanced meshes (copy per-instance)
+                if (child instanceof THREE.InstancedMesh && child.geometry) {
+                    const baseClean = sanitizeGeometry(child.geometry)
+                    if (!baseClean) return
+                    const instanceMatrix = new THREE.Matrix4()
+                    for (let i = 0; i < child.count; i++) {
+                        child.getMatrixAt(i, instanceMatrix)
+                        const clean = baseClean.clone()
+                        tempMatrix.copy(child.matrixWorld).multiply(instanceMatrix).multiply(scaleMatrix)
+                        clean.applyMatrix4(tempMatrix)
+                        clean.computeBoundingBox()
+                        const bb = clean.boundingBox
+                        if (bb) worldMinY = Math.min(worldMinY, bb.min.y)
+                        geometries.push(clean)
+                    }
+                    return
+                }
+
                 if (child instanceof THREE.Mesh && child.geometry) {
                     const clean = sanitizeGeometry(child.geometry)
                     if (!clean) return
