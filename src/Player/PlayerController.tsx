@@ -527,7 +527,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             // Jump
             if (jump && isGrounded.current) {
                 const now = Date.now()
-                if (now - lastJumpTime.current > 300) {
+                if (now - lastJumpTime.current > 1000) {
                     body.current.setLinvel({ x: vel.x, y: JUMP_FORCE, z: vel.z }, true)
                     isGrounded.current = false
                     lastJumpTime.current = now
