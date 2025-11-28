@@ -34,6 +34,8 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     const playerId = useGameStore((state) => state.playerId)
     const pendingSpawnPoint = useGameStore((state) => state.pendingSpawnPoint)
     const pendingZombieSpawnPoint = useGameStore((state) => state.pendingZombieSpawnPoint)
+    const isBeingInfected = useGameStore((state) => state.isBeingInfected)
+    const pendingInfectionSpawn = useGameStore((state) => state.pendingInfectionSpawn)
 
     // Reference to the character mesh group for rotation
     const characterRef = useRef<THREE.Group>(null)
@@ -54,6 +56,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     const [cameraMode, setCameraMode] = useState<'FIRST' | 'THIRD'>('FIRST')
     const [isMoving, setIsMoving] = useState(false)
     const [isRunning, setIsRunning] = useState(false)
+    const [isAttacking, setIsAttacking] = useState(false)
     const mapLoaded = useGameStore((state) => state.mapLoaded)
     const wasMapLoaded = useRef(false)
     const movementLocked = useGameStore((state) => state.movementLocked)
@@ -88,6 +91,25 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
         }
         prevGameState.current = infectedGameState
     }, [infectedGameState, isInfected, pendingSpawnPoint, pendingZombieSpawnPoint])
+    
+    // Track previous infection transition state
+    const wasBeingInfected = useRef(false)
+    
+    // Teleport player when infection transition ends
+    useEffect(() => {
+        if (wasBeingInfected.current && !isBeingInfected && pendingInfectionSpawn) {
+            if (body.current) {
+                body.current.setTranslation({ 
+                    x: pendingInfectionSpawn[0], 
+                    y: pendingInfectionSpawn[1], 
+                    z: pendingInfectionSpawn[2] 
+                }, true)
+                body.current.setLinvel({ x: 0, y: 0, z: 0 }, true)
+                console.log('Teleported to zombie spawn after infection:', pendingInfectionSpawn)
+            }
+        }
+        wasBeingInfected.current = isBeingInfected
+    }, [isBeingInfected, pendingInfectionSpawn])
 
     // Audio Listener (The "Ears" of the player)
     useEffect(() => {
@@ -186,6 +208,10 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             if (now - lastAttackTime.current < 500) return // 500ms cooldown
             lastAttackTime.current = now
             
+            // Trigger attack animation
+            setIsAttacking(true)
+            setTimeout(() => setIsAttacking(false), 500) // Reset after animation
+            
             if (!body.current || !playerId) return
             
             const myPos = body.current.translation()
@@ -246,6 +272,14 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
         // Freeze player during STARTING phase (transition screen)
         const currentGameState = useGameStore.getState().infectedGameState
         if (currentGameState === 'STARTING') {
+            body.current.setGravityScale(0, true)
+            body.current.setLinvel({ x: 0, y: 0, z: 0 }, true)
+            return
+        }
+        
+        // Freeze player during infection transition (when getting infected mid-game)
+        const currentlyBeingInfected = useGameStore.getState().isBeingInfected
+        if (currentlyBeingInfected) {
             body.current.setGravityScale(0, true)
             body.current.setLinvel({ x: 0, y: 0, z: 0 }, true)
             return
@@ -531,6 +565,7 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
                         isRunning={isRunning}
                         showNameplate={false}
                         isInfected={isInfected}
+                        isAttacking={isAttacking}
                     />
                 </group>
             )}

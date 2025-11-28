@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useGameStore } from '../stores/useGameStore'
 
 export const DeathScreen = () => {
@@ -7,29 +7,51 @@ export const DeathScreen = () => {
     const infectedPlayers = useGameStore((state) => state.infectedPlayers)
     
     const [showInfectedMessage, setShowInfectedMessage] = useState(false)
-    const [wasInfected, setWasInfected] = useState(false)
+    const wasInfectedRef = useRef(false)
+    const prevInfectedCountRef = useRef(0)
     
-    // Detect when player becomes infected
+    // Detect when player becomes infected DURING GAMEPLAY (not at game start)
     useEffect(() => {
-        const isInGame = infectedGameState === 'PLAYING' || infectedGameState === 'STARTING'
-        if (playerId && infectedPlayers.includes(playerId) && !wasInfected && isInGame) {
-            setWasInfected(true)
+        if (!playerId) return
+        
+        const isPlayerInfected = infectedPlayers.includes(playerId)
+        const infectedCount = infectedPlayers.length
+        
+        // Only show message if:
+        // 1. We're in PLAYING state (not STARTING - that's handled by GameStartingLoader)
+        // 2. Player just became infected (wasn't before)
+        // 3. This is a mid-game infection (infected count increased, meaning someone was attacked)
+        if (
+            infectedGameState === 'PLAYING' &&
+            isPlayerInfected &&
+            !wasInfectedRef.current &&
+            infectedCount > prevInfectedCountRef.current &&
+            prevInfectedCountRef.current > 0
+        ) {
+            wasInfectedRef.current = true
             setShowInfectedMessage(true)
-            // Hide message after 3 seconds
             const timer = setTimeout(() => setShowInfectedMessage(false), 3000)
             return () => clearTimeout(timer)
         }
-    }, [playerId, infectedPlayers, wasInfected, infectedGameState])
+        
+        // Track infection state
+        if (isPlayerInfected) {
+            wasInfectedRef.current = true
+        }
+        prevInfectedCountRef.current = infectedCount
+    }, [playerId, infectedPlayers, infectedGameState])
     
-    // Reset wasInfected when game ends
+    // Reset when game ends
     useEffect(() => {
         if (infectedGameState === 'WAITING' || infectedGameState === 'VOTING') {
-            setWasInfected(false)
+            wasInfectedRef.current = false
+            prevInfectedCountRef.current = 0
             setShowInfectedMessage(false)
         }
     }, [infectedGameState])
 
-    // Show "You are infected" message briefly when becoming a zombie
+    // Don't show death screen - InfectionLoader handles the transition now
+    // This message is just a brief notification after the loader
     if (showInfectedMessage) {
         return (
             <div className="fixed inset-0 z-[12000] flex items-center justify-center pointer-events-none">
@@ -45,6 +67,5 @@ export const DeathScreen = () => {
         )
     }
 
-    // Don't show death screen during infected mode - players become zombies instead
     return null
 }

@@ -16,6 +16,7 @@ interface CharacterModelProps {
     playerId?: string
     showNameplate?: boolean
     isInfected?: boolean
+    isAttacking?: boolean
 }
 
 export default function CharacterModel({
@@ -26,7 +27,8 @@ export default function CharacterModel({
     isSpeaking = false,
     playerId,
     showNameplate = true,
-    isInfected = false
+    isInfected = false,
+    isAttacking = false
 }: CharacterModelProps) {
     const group = useRef<Group>(null)
     const phase = useGameStore((state) => state.phase)
@@ -93,6 +95,7 @@ export default function CharacterModel({
 
     // Smooth action switching to avoid momentary T-poses on key press
     const activeActionRef = useRef<THREE.AnimationAction | null>(null)
+    const isPlayingAttack = useRef(false)
 
     useEffect(() => {
         const findAction = (name: string) => {
@@ -105,16 +108,46 @@ export default function CharacterModel({
         const runAction = findAction('run') || actions[Object.keys(actions)[2]]
         const walkAction = findAction('walk') || actions[Object.keys(actions)[1]]
         const idleAction = findAction('idle') || actions[Object.keys(actions)[0]]
+        const attackAction = findAction('attack') || findAction('punch') || findAction('hit') || findAction('bite')
 
-        const switchTo = (next?: THREE.AnimationAction | null) => {
+        const switchTo = (next?: THREE.AnimationAction | null, loop = true) => {
             if (!next) return
             const current = activeActionRef.current
-            if (current === next) return
+            if (current === next && loop) return
 
             next.reset().fadeIn(0.12).play()
+            if (!loop) {
+                next.setLoop(THREE.LoopOnce, 1)
+                next.clampWhenFinished = true
+            }
             if (current) current.fadeOut(0.1)
             activeActionRef.current = next
         }
+
+        // Handle attack animation (priority over movement)
+        if (isAttacking && attackAction && !isPlayingAttack.current) {
+            isPlayingAttack.current = true
+            switchTo(attackAction, false)
+            
+            // Return to idle/walk after attack animation
+            const duration = attackAction.getClip().duration * 1000
+            setTimeout(() => {
+                isPlayingAttack.current = false
+                if (isMoving) {
+                    if (isRunning && runAction) {
+                        switchTo(runAction)
+                    } else if (walkAction) {
+                        switchTo(walkAction)
+                    }
+                } else {
+                    switchTo(idleAction)
+                }
+            }, duration)
+            return
+        }
+
+        // Don't switch animations while attack is playing
+        if (isPlayingAttack.current) return
 
         if (isMoving) {
             if (isRunning && runAction) {
@@ -127,7 +160,7 @@ export default function CharacterModel({
         } else {
             switchTo(idleAction)
         }
-    }, [isMoving, isRunning, actions, animations, characterIndex, phase, currentRoomId])
+    }, [isMoving, isRunning, isAttacking, actions, animations, characterIndex, phase, currentRoomId])
 
     // Safety: ensure an action is playing after respawn / room switch
     useEffect(() => {

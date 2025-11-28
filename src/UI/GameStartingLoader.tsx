@@ -65,7 +65,7 @@ export default function GameStartingLoader() {
                         ? 'bg-red-600/90 text-white border-2 border-red-400/50 shadow-[0_0_30px_rgba(220,38,38,0.5)]' 
                         : 'bg-green-600/90 text-white border-2 border-green-400/50 shadow-[0_0_30px_rgba(34,197,94,0.5)]'
                 }`}>
-                    {isInfected ? 'TU ES LE ZOMBIE' : 'TU ES UN SURVIVANT'}
+                    {isInfected ? 'YOU ARE THE ZOMBIE' : 'YOU ARE A SURVIVOR'}
                 </div>
                 
                 <h1 className="text-6xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60 drop-shadow-2xl mb-4">
@@ -74,7 +74,7 @@ export default function GameStartingLoader() {
                 
                 <div className="flex flex-col items-center gap-4 mt-4">
                     <div className="text-[11px] uppercase tracking-[0.26em] text-white/60">
-                        La partie commence dans
+                        Game starts in
                     </div>
                     
                     <div className={`text-7xl font-black tabular-nums drop-shadow-2xl ${
@@ -89,15 +89,15 @@ export default function GameStartingLoader() {
                         isInfected ? 'text-red-300/80' : 'text-green-300/80'
                     }`}>
                         {isInfected 
-                            ? 'Prepare-toi a infecter les survivants !' 
-                            : 'Prepare-toi a fuir le zombie !'}
+                            ? 'Get ready to hunt the survivors!' 
+                            : 'Get ready to run from the zombie!'}
                     </p>
                 </div>
             </div>
 
             {/* Footer */}
             <div className="absolute bottom-8 text-white/20 font-mono text-xs tracking-widest">
-                TELEPORTATION EN COURS...
+                TELEPORTING...
             </div>
         </div>
     )

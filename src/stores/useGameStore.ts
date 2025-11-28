@@ -78,6 +78,12 @@ interface GameState {
     pendingZombieSpawnPoint: [number, number, number] | null
     startingCountdownEnd: number | null
     
+    // Infection transition (when player gets infected mid-game)
+    isBeingInfected: boolean
+    infectionTransitionEnd: number | null
+    pendingInfectionSpawn: [number, number, number] | null
+    clearInfectionTransition: () => void
+    
     isPlayerDead: boolean
     setPlayerDead: (dead: boolean) => void
     movementLocked: boolean
@@ -188,6 +194,16 @@ export const useGameStore = create<GameState>((set, get) => ({
     pendingSpawnPoint: null,
     pendingZombieSpawnPoint: null,
     startingCountdownEnd: null,
+    
+    // Infection transition defaults
+    isBeingInfected: false,
+    infectionTransitionEnd: null,
+    pendingInfectionSpawn: null,
+    clearInfectionTransition: () => set({
+        isBeingInfected: false,
+        infectionTransitionEnd: null,
+        pendingInfectionSpawn: null,
+    }),
     
     isPlayerDead: false,
     setPlayerDead: (dead) => {
@@ -423,20 +439,36 @@ export const useGameStore = create<GameState>((set, get) => ({
             console.log(`Game started! You are ${isInfected ? 'INFECTED' : 'a SURVIVOR'}`)
         })
         
-        socket.on('playerInfected', ({ playerId: victimId }) => {
+        socket.on('playerInfected', ({ playerId: victimId, zombieSpawnPoint }) => {
             const myId = get().playerId
+            const isMe = myId === victimId
+            
             set((state) => {
                 const newInfected = state.infectedPlayers.includes(victimId) 
                     ? state.infectedPlayers 
                     : [...state.infectedPlayers, victimId]
-                return {
+                
+                const baseUpdate = {
                     infectedPlayers: newInfected,
-                    isInfected: myId === victimId ? true : state.isInfected,
+                    isInfected: isMe ? true : state.isInfected,
                     survivorCount: Object.keys(state.players).length - newInfected.length,
                 }
+                
+                // If it's us being infected, trigger the transition loader
+                if (isMe) {
+                    return {
+                        ...baseUpdate,
+                        isBeingInfected: true,
+                        infectionTransitionEnd: Date.now() + 3000, // 3 seconds
+                        pendingInfectionSpawn: zombieSpawnPoint,
+                    }
+                }
+                
+                return baseUpdate
             })
-            if (myId === victimId) {
-                console.log('You have been INFECTED!')
+            
+            if (isMe) {
+                console.log('You have been INFECTED! Transitioning...')
             }
         })
         
@@ -554,6 +586,9 @@ export const useGameStore = create<GameState>((set, get) => ({
             pendingSpawnPoint: null,
             pendingZombieSpawnPoint: null,
             startingCountdownEnd: null,
+            isBeingInfected: false,
+            infectionTransitionEnd: null,
+            pendingInfectionSpawn: null,
         })
     },
 
