@@ -315,6 +315,23 @@ export const useGameStore = create<GameState>((set, get) => ({
         if (socket) {
             socket.emit('speaking', isSpeaking)
         }
+        
+        // Optimistic update for local player
+        const playerId = get().playerId
+        if (playerId) {
+             set((state) => {
+                if (!state.players[playerId]) return state
+                return {
+                    players: {
+                        ...state.players,
+                        [playerId]: {
+                            ...state.players[playerId],
+                            isSpeaking
+                        }
+                    }
+                }
+            })
+        }
     },
 
     isDebugMode: false,

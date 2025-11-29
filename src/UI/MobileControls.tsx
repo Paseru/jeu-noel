@@ -125,7 +125,8 @@ export default function MobileControls({ onOpenMenu }: MobileControlsProps) {
     }
 
     // Mic Toggle
-    const isSpeaking = useGameStore((state) => state.players[useGameStore.getState().playerId || '']?.isSpeaking)
+    const playerId = useGameStore((state) => state.playerId)
+    const isSpeaking = useGameStore((state) => playerId ? state.players[playerId]?.isSpeaking : false)
     const setSpeaking = useGameStore((state) => state.setSpeaking)
 
     return (
@@ -156,7 +157,7 @@ export default function MobileControls({ onOpenMenu }: MobileControlsProps) {
                 }}
                 className={`absolute left-8 w-14 h-14 rounded-full flex items-center justify-center backdrop-blur-md border transition-all pointer-events-auto active:scale-95 z-[2001] ${isSpeaking
                     ? 'bg-green-500/80 border-green-400 text-white shadow-[0_0_15px_rgba(74,222,128,0.5)]'
-                    : 'bg-black/40 border-white/20 text-white/60'
+                    : 'bg-red-500/40 border-red-400/50 text-white/90'
                     }`}
                 style={{
                     bottom: 'calc(max(2rem, env(safe-area-inset-bottom)) + 12rem)' // Positioned above joystick
@@ -169,9 +170,7 @@ export default function MobileControls({ onOpenMenu }: MobileControlsProps) {
                     </svg>
                 ) : (
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7">
-                        <path d="M12.25 4.5a3.75 3.75 0 117.5 0v8.25a3.75 3.75 0 11-7.5 0V4.5z" />
-                        <path d="M10 10.5a.75.75 0 01.75.75v1.5a5.25 5.25 0 1010.5 0v-1.5a.75.75 0 011.5 0v1.5a6.751 6.751 0 01-6 6.709v2.291h3a.75.75 0 010 1.5h-7.5a.75.75 0 010-1.5h3v-2.291a6.751 6.751 0 01-6-6.709v-1.5A.75.75 0 0110 10.5z" />
-                        <path fillRule="evenodd" d="M3.53 2.47a.75.75 0 00-1.06 1.06l18 18a.75.75 0 101.06-1.06l-18-18zM20.25 12.75a.75.75 0 00-1.5 0v1.5c0 .409-.02.812-.058 1.209l1.495 1.495c.042-.886.063-1.786.063-2.704v-1.5z" clipRule="evenodd" />
+                        <path fillRule="evenodd" d="M3.53 2.47a.75.75 0 00-1.06 1.06l18 18a.75.75 0 101.06-1.06l-18-18zM15.75 4.5a3.75 3.75 0 10-7.5 0v3.682l7.5 7.5V4.5zM8.25 9.818v2.932a3.75 3.75 0 004.5 3.682v-2.114a5.25 5.25 0 01-6.75-2.064V9.818zM16.5 13.282v-1.532a5.25 5.25 0 00-3.065-4.824l1.965 1.965A5.237 5.237 0 0116.5 11.75zM12.75 19.459V21a.75.75 0 01-1.5 0v-1.541a6.75 6.75 0 01-5.166-5.209.75.75 0 011.492-.15 5.25 5.25 0 003.674 3.884v.016h.001v-.016a5.25 5.25 0 002.874-1.154l1.02 1.02a6.75 6.75 0 01-2.395 1.609z" clipRule="evenodd" />
                     </svg>
                 )}
             </button>

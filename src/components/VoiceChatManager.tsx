@@ -63,6 +63,17 @@ export default function VoiceChatManager() {
         }
     }, [setLocalStream])
 
+    // Toggle Mute/Unmute based on store state (for Mobile/GUI toggle)
+    const isSpeaking = playerId ? players[playerId]?.isSpeaking : false
+    useEffect(() => {
+        if (localStreamRef.current) {
+            localStreamRef.current.getAudioTracks().forEach(track => {
+                track.enabled = !!isSpeaking
+            })
+            useVoiceStore.getState().setMicrophoneActive(!!isSpeaking)
+        }
+    }, [isSpeaking])
+
     // Push to Talk Logic (V key)
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
