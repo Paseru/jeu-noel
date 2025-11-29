@@ -7,10 +7,12 @@ export default function GameStartingLoader() {
     const startingCountdownEnd = useGameStore((state) => state.startingCountdownEnd)
     const playerId = useGameStore((state) => state.playerId)
     const infectedPlayers = useGameStore((state) => state.infectedPlayers)
+    const storeIsInfected = useGameStore((state) => state.isInfected)
     const room = rooms.find(r => r.id === currentRoomId)
     
     // Calculate isInfected locally for reliability (store's isInfected may not be updated yet)
-    const isInfected = playerId ? infectedPlayers.includes(playerId) : false
+    // Prefer explicit flag (set by gameStarting), fall back to list membership
+    const isInfected = storeIsInfected || (playerId ? infectedPlayers.includes(playerId) : false)
     
     // Debug log
     console.log('[GameStartingLoader] isInfected:', isInfected, 'playerId:', playerId, 'infectedPlayers:', infectedPlayers)

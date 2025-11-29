@@ -405,13 +405,19 @@ export const useGameStore = create<GameState>((set, get) => ({
 
         socket.on('gameStateUpdate', ({ state: gameState, countdownEnd, infectedPlayers, survivorCount, minPlayers }) => {
             const playerId = get().playerId
-            set({
-                infectedGameState: gameState,
-                countdownEnd,
-                infectedPlayers,
-                survivorCount,
-                minPlayers,
-                isInfected: playerId ? infectedPlayers.includes(playerId) : false,
+            set((state) => {
+                const isInfectedFromList = playerId ? infectedPlayers.includes(playerId) : false
+                const shouldKeepFlag = gameState === 'STARTING'
+                return {
+                    infectedGameState: gameState,
+                    countdownEnd,
+                    infectedPlayers,
+                    survivorCount,
+                    minPlayers,
+                    // During STARTING, keep whatever flag was set by `gameStarting` to avoid
+                    // being overwritten if the broadcast temporarily lacks our id.
+                    isInfected: shouldKeepFlag ? state.isInfected : isInfectedFromList,
+                }
             })
         })
         
