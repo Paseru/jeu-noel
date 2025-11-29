@@ -48,7 +48,7 @@ const ROOMS = [
     }
 ];
 
-const MIN_PLAYERS = 3;
+const MIN_PLAYERS = 2;
 const COUNTDOWN_SECONDS = 60;
 const STARTING_SECONDS = 5;
 const VOTE_SECONDS = 20;
