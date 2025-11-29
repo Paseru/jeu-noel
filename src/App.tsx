@@ -222,13 +222,13 @@ export default function App() {
             />
             <audio
                 ref={ambientAudioRef}
-                src="/sounds/NIGHT AMBIENT Sounds  CRICKETS  DARK SCREEN  Sleep and Relaxation  Nature Sounds.mp3"
+                src="/sounds/night-ambient.mp3"
                 loop
                 preload="auto"
             />
             <audio
                 ref={windAudioRef}
-                src="/sounds/Soft Wind Sound. Sounds To Help Sleep.mp3"
+                src="/sounds/wind.mp3"
                 loop
                 preload="auto"
             />
