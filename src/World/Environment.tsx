@@ -5,7 +5,7 @@ export const Environment = () => {
         <>
             {/* Background and distance fog */}
             <color attach="background" args={['#1C1917']} />
-            <fogExp2 attach="fog" args={['#1C1917', 0.04]} />
+            <fogExp2 attach="fog" args={['#1C1917', 0.06]} />
 
             {/* HDRI for realistic reflections */}
             <DreiEnvironment preset="night" />
