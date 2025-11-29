@@ -199,6 +199,10 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
     // Attack cooldown for infected players
     const lastAttackTime = useRef(0)
     
+    // Camera lunge effect for zombie attack
+    const attackLungeProgress = useRef(0)
+    const isLunging = useRef(false)
+    
     // Handle click to attack (for infected players)
     useEffect(() => {
         if (!isInfected || infectedGameState !== 'PLAYING') return
@@ -211,6 +215,10 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
             // Trigger attack animation
             setIsAttacking(true)
             setTimeout(() => setIsAttacking(false), 500) // Reset after animation
+            
+            // Trigger camera lunge effect
+            isLunging.current = true
+            attackLungeProgress.current = 0
             
             if (!body.current || !playerId) return
             
@@ -428,9 +436,37 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
 
         const bobOffset = (!flyMode && cameraMode === 'FIRST' && moving) ? Math.sin(bobState.current) * 0.1 : 0
 
+        // Camera lunge effect for zombie attack
+        let lungeOffset = 0
+        if (isLunging.current) {
+            attackLungeProgress.current += delta * 8
+            
+            if (attackLungeProgress.current < 0.5) {
+                // Forward phase: move camera forward
+                lungeOffset = attackLungeProgress.current * 1.0
+            } else if (attackLungeProgress.current < 1.0) {
+                // Return phase: move camera back
+                lungeOffset = (1.0 - attackLungeProgress.current) * 1.0
+            } else {
+                // Done
+                isLunging.current = false
+                attackLungeProgress.current = 0
+            }
+        }
+
         if (cameraMode === 'FIRST') {
             // First person: Camera matches player position
-            camera.position.set(translation.x, translation.y + 1 + bobOffset, translation.z)
+            if (lungeOffset > 0) {
+                // Apply lunge in view direction
+                const lungeDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
+                camera.position.set(
+                    translation.x + lungeDirection.x * lungeOffset,
+                    translation.y + 1 + bobOffset - lungeOffset * 0.15, // Slight downward for headbutt effect
+                    translation.z + lungeDirection.z * lungeOffset
+                )
+            } else {
+                camera.position.set(translation.x, translation.y + 1 + bobOffset, translation.z)
+            }
         } else {
             // Third Person Camera (Orbit)
             const cameraDirection = new THREE.Vector3(0, 0, -1)
