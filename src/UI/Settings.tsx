@@ -82,6 +82,40 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
                                 className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white hover:accent-gray-200 transition-all"
                             />
                         </div>
+
+                        {/* Ambient Volume */}
+                        <div>
+                            <div className="flex justify-between text-white mb-2">
+                                <span className="text-sm font-bold tracking-wider text-white/70 uppercase">Ambient Sound</span>
+                                <span className="text-sm font-mono text-white/50">{Math.round(volumes.ambient * 100)}%</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                value={volumes.ambient}
+                                onChange={(e) => setVolume('ambient', parseFloat(e.target.value))}
+                                className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white hover:accent-gray-200 transition-all"
+                            />
+                        </div>
+
+                        {/* Wind Volume */}
+                        <div>
+                            <div className="flex justify-between text-white mb-2">
+                                <span className="text-sm font-bold tracking-wider text-white/70 uppercase">Wind</span>
+                                <span className="text-sm font-mono text-white/50">{Math.round(volumes.wind * 100)}%</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                value={volumes.wind}
+                                onChange={(e) => setVolume('wind', parseFloat(e.target.value))}
+                                className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white hover:accent-gray-200 transition-all"
+                            />
+                        </div>
                     </div>
 
                     {/* Controls Guide */}

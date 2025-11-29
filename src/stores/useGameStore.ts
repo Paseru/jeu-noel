@@ -131,8 +131,10 @@ interface GameState {
         music: number
         voice: number
         sfx: number
+        ambient: number
+        wind: number
     }
-    setVolume: (type: 'music' | 'voice' | 'sfx', value: number) => void
+    setVolume: (type: 'music' | 'voice' | 'sfx' | 'ambient' | 'wind', value: number) => void
 
     connectSocket: () => void
     fetchRooms: () => void
@@ -261,7 +263,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     volumes: {
         music: 0.01,
         voice: 1.0,
-        sfx: 0.5
+        sfx: 0.5,
+        ambient: 0.2,
+        wind: 0.4
     },
 
     setVolume: (type, value) => set((state) => ({

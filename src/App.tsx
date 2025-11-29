@@ -37,6 +37,8 @@ export default function App() {
     const [isPlayerListOpen, setIsPlayerListOpen] = useState(false)
     const menuAudioRef = useRef<HTMLAudioElement>(null)
     const gameAudioRef = useRef<HTMLAudioElement>(null)
+    const ambientAudioRef = useRef<HTMLAudioElement>(null)
+    const windAudioRef = useRef<HTMLAudioElement>(null)
 
     const { phase, volumes, mapLoaded, infectedGameState, isBeingInfected } = useGameStore()
     useEffect(() => {
@@ -50,29 +52,48 @@ export default function App() {
     useEffect(() => {
         if (menuAudioRef.current) menuAudioRef.current.volume = volumes.music
         if (gameAudioRef.current) gameAudioRef.current.volume = volumes.music
-    }, [volumes.music])
+        if (ambientAudioRef.current) ambientAudioRef.current.volume = volumes.ambient
+        if (windAudioRef.current) windAudioRef.current.volume = volumes.wind
+    }, [volumes.music, volumes.ambient, volumes.wind])
 
     useEffect(() => {
         const menuAudio = menuAudioRef.current
         const gameAudio = gameAudioRef.current
+        const ambientAudio = ambientAudioRef.current
+        const windAudio = windAudioRef.current
 
-        if (!menuAudio || !gameAudio) return
+        if (!menuAudio || !gameAudio || !ambientAudio || !windAudio) return
 
         if (phase === 'MENU') {
             gameAudio.pause()
             gameAudio.currentTime = 0
+            ambientAudio.pause()
+            ambientAudio.currentTime = 0
+            windAudio.pause()
+            windAudio.currentTime = 0
+
             menuAudio.volume = volumes.music
             menuAudio.play().catch(() => {
                 console.log('Menu music autoplay blocked, waiting for interaction')
             })
         } else if (phase === 'PLAYING') {
             menuAudio.pause()
+            
             gameAudio.volume = volumes.music
-            gameAudio.play().catch(() => {
+            ambientAudio.volume = volumes.ambient
+            windAudio.volume = volumes.wind
+            
+            const playPromise = Promise.all([
+                gameAudio.play(),
+                ambientAudio.play(),
+                windAudio.play()
+            ])
+            
+            playPromise.catch(() => {
                 console.log('In-game music autoplay blocked, waiting for interaction')
             })
         }
-    }, [phase, volumes.music])
+    }, [phase, volumes.music, volumes.ambient, volumes.wind])
 
     // Play on first interaction if autoplay was blocked
     const audioListener = useVoiceStore((state) => state.audioListener)
@@ -80,10 +101,14 @@ export default function App() {
     // Play on first interaction if autoplay was blocked
     useEffect(() => {
         const handleInteraction = () => {
-            const targetAudio = phase === 'PLAYING' ? gameAudioRef.current : menuAudioRef.current
-            if (targetAudio && targetAudio.paused) {
-                targetAudio.play()
+            if (phase === 'PLAYING') {
+                if (gameAudioRef.current && gameAudioRef.current.paused) gameAudioRef.current.play()
+                if (ambientAudioRef.current && ambientAudioRef.current.paused) ambientAudioRef.current.play()
+                if (windAudioRef.current && windAudioRef.current.paused) windAudioRef.current.play()
+            } else {
+                if (menuAudioRef.current && menuAudioRef.current.paused) menuAudioRef.current.play()
             }
+
             if (audioListener && audioListener.context.state === 'suspended') {
                 audioListener.context.resume()
             }
@@ -192,6 +217,18 @@ export default function App() {
             <audio
                 ref={gameAudioRef}
                 src="/sounds/(Free) Horror Ambiance - Ominous Background Music.mp3"
+                loop
+                preload="auto"
+            />
+            <audio
+                ref={ambientAudioRef}
+                src="/sounds/NIGHT AMBIENT Sounds  CRICKETS  DARK SCREEN  Sleep and Relaxation  Nature Sounds.mp3"
+                loop
+                preload="auto"
+            />
+            <audio
+                ref={windAudioRef}
+                src="/sounds/Soft Wind Sound. Sounds To Help Sleep.mp3"
                 loop
                 preload="auto"
             />
