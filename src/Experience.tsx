@@ -4,9 +4,9 @@ import { PlayerController } from './Player/PlayerController'
 import { Lights } from './World/Lights'
 import { Environment } from './World/Environment'
 import { Map } from './World/Map'
-import { Snow } from './World/Snow'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import SpectatorController from './components/SpectatorController'
+import { VHSEffect } from './components/VHSEffect'
 
 import { useGameStore } from './stores/useGameStore'
 import RemotePlayer from './Multiplayer/RemotePlayer'
@@ -26,7 +26,6 @@ export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
             <Physics gravity={[0, -20, 0]} debug={isDebugMode}>
                 <Lights />
                 <Environment />
-                <Snow />
                 <ErrorBoundary fallback={
                     <mesh position={[0, 1, 0]}>
                         <boxGeometry args={[1, 1, 1]} />
@@ -67,8 +66,7 @@ export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
                 </Suspense>
             </Physics>
 
-            {/* <Lights /> */}
-            {/* <Environment /> */}
+            <VHSEffect />
         </>
     )
 }

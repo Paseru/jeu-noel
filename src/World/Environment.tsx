@@ -3,14 +3,11 @@ import { Environment as DreiEnvironment } from '@react-three/drei'
 export const Environment = () => {
     return (
         <>
-            {/* Exponential Fog for the dense atmosphere */}
-            {/* Color matches the background to blend seamlessly */}
-            <color attach="background" args={['#050511']} />
-            <fogExp2 attach="fog" args={['#050511', 0.03]} />
+            {/* Dense horror fog - dark blue-gray color */}
+            <color attach="background" args={['#0a0a12']} />
+            <fogExp2 attach="fog" args={['#0a0a12', 0.065]} />
 
-            {/* Volumetric Fog removed by user request */}
-
-            {/* HDRI for realistic reflections, even if not visible directly */}
+            {/* HDRI for realistic reflections */}
             <DreiEnvironment preset="night" />
         </>
     )
