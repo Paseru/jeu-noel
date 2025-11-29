@@ -6,7 +6,6 @@ import { Environment } from './World/Environment'
 import { Map } from './World/Map'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import SpectatorController from './components/SpectatorController'
-import { VHSEffect } from './components/VHSEffect'
 
 import { useGameStore } from './stores/useGameStore'
 import RemotePlayer from './Multiplayer/RemotePlayer'
@@ -65,8 +64,6 @@ export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
                     })}
                 </Suspense>
             </Physics>
-
-            <VHSEffect />
         </>
     )
 }
