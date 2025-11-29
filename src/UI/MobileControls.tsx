@@ -6,7 +6,7 @@ interface MobileControlsProps {
 }
 
 export default function MobileControls({ onOpenMenu }: MobileControlsProps) {
-    const { setJoystick, addLookDelta, setMobileJump, setMobileRun } = useGameStore()
+    const { setJoystick, addLookDelta, setMobileJump, setMobileRun, setMobileAttack } = useGameStore()
     const joystickRef = useRef<HTMLDivElement>(null)
     const [joystickPos, setJoystickPos] = useState({ x: 0, y: 0 })
     const [isDragging, setIsDragging] = useState(false)
@@ -14,6 +14,15 @@ export default function MobileControls({ onOpenMenu }: MobileControlsProps) {
     // Track specific touch IDs to avoid conflicts
     const joystickTouchId = useRef<number | null>(null)
     const cameraTouchId = useRef<number | null>(null)
+
+    // Mic Toggle
+    const playerId = useGameStore((state) => state.playerId)
+    const isSpeaking = useGameStore((state) => playerId ? state.players[playerId]?.isSpeaking : false)
+    const setSpeaking = useGameStore((state) => state.setSpeaking)
+    
+    // Attack Button Visibility
+    const isInfected = useGameStore((state) => state.isInfected)
+    const infectedGameState = useGameStore((state) => state.infectedGameState)
 
     // Joystick Logic
     const handleTouchStart = (e: React.TouchEvent) => {
@@ -124,11 +133,6 @@ export default function MobileControls({ onOpenMenu }: MobileControlsProps) {
         }
     }
 
-    // Mic Toggle
-    const playerId = useGameStore((state) => state.playerId)
-    const isSpeaking = useGameStore((state) => playerId ? state.players[playerId]?.isSpeaking : false)
-    const setSpeaking = useGameStore((state) => state.setSpeaking)
-
     return (
         // Changed md:hidden to lg:hidden to ensure it shows on landscape tablets/phones
         <div className="fixed inset-0 z-[2000] pointer-events-none flex select-none touch-none block lg:hidden">
@@ -177,12 +181,12 @@ export default function MobileControls({ onOpenMenu }: MobileControlsProps) {
 
             {/* Jump and Sprint Buttons (Bottom Right) */}
             <div
-                className="absolute right-8 flex gap-4 pointer-events-auto z-[2001]"
+                className="absolute right-8 pointer-events-auto z-[2001] flex gap-4 items-end"
                 style={{
                     bottom: 'max(2rem, env(safe-area-inset-bottom))'
                 }}
             >
-                {/* Sprint Button */}
+                {/* Sprint Button (Left of Jump) */}
                 <button
                     onTouchStart={(e) => {
                         e.preventDefault()
@@ -199,22 +203,44 @@ export default function MobileControls({ onOpenMenu }: MobileControlsProps) {
                     SPRINT
                 </button>
 
-                {/* Jump Button */}
-                <button
-                    onTouchStart={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        setMobileJump(true)
-                    }}
-                    onTouchEnd={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        setMobileJump(false)
-                    }}
-                    className="w-20 h-12 rounded-lg bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white font-bold text-sm active:bg-white/20 active:scale-95 transition-all"
-                >
-                    JUMP
-                </button>
+                {/* Right Column: Attack (if infected) and Jump */}
+                <div className="flex flex-col gap-4 items-center">
+                    {/* Attack Button (Only for infected players) */}
+                    {isInfected && infectedGameState === 'PLAYING' && (
+                        <button
+                            onTouchStart={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setMobileAttack(true)
+                            }}
+                            onTouchEnd={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setMobileAttack(false)
+                            }}
+                            className="w-20 h-20 rounded-full bg-red-600/60 backdrop-blur-md border-2 border-red-400 flex items-center justify-center text-white font-bold text-sm active:bg-red-500/80 active:scale-95 transition-all shadow-[0_0_15px_rgba(220,38,38,0.5)]"
+                        >
+                            ATTACK
+                        </button>
+                    )}
+
+                    {/* Jump Button */}
+                    <button
+                        onTouchStart={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setMobileJump(true)
+                        }}
+                        onTouchEnd={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setMobileJump(false)
+                        }}
+                        className="w-20 h-12 rounded-lg bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white font-bold text-sm active:bg-white/20 active:scale-95 transition-all"
+                    >
+                        JUMP
+                    </button>
+                </div>
             </div>
 
             {/* Left Side: Joystick Zone */}

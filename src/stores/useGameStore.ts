@@ -20,6 +20,7 @@ interface MobileInputState {
     lookDelta: { x: number, y: number }
     isJumping: boolean
     isRunning: boolean
+    isAttacking: boolean
 }
 
 interface ChatMessage {
@@ -114,6 +115,7 @@ interface GameState {
     resetLookDelta: () => void
     setMobileJump: (isJumping: boolean) => void
     setMobileRun: (isRunning: boolean) => void
+    setMobileAttack: (isAttacking: boolean) => void
 
     myCharacterIndex: number
     setMyCharacterIndex: (index: number) => void
@@ -276,7 +278,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         joystick: { x: 0, y: 0 },
         lookDelta: { x: 0, y: 0 },
         isJumping: false,
-        isRunning: false
+        isRunning: false,
+        isAttacking: false
     },
 
     setJoystick: (x, y) => set((state) => ({
@@ -303,6 +306,10 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     setMobileRun: (isRunning) => set((state) => ({
         mobileInput: { ...state.mobileInput, isRunning }
+    })),
+
+    setMobileAttack: (isAttacking) => set((state) => ({
+        mobileInput: { ...state.mobileInput, isAttacking }
     })),
 
     myCharacterIndex: 1,
