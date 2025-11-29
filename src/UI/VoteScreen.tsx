@@ -10,6 +10,19 @@ export const VoteScreen = () => {
     const vote = useGameStore((state) => state.vote)
     
     const [countdown, setCountdown] = useState<number | null>(null)
+
+    // Ensure cursor is visible and pointer lock is released when the vote screen is shown
+    useEffect(() => {
+        if (infectedGameState !== 'VOTING') return
+
+        const prevCursor = document.body.style.cursor
+        document.exitPointerLock?.()
+        document.body.style.cursor = 'auto'
+
+        return () => {
+            document.body.style.cursor = prevCursor
+        }
+    }, [infectedGameState])
     
     useEffect(() => {
         if (!voteEnd) {

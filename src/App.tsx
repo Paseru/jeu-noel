@@ -226,33 +226,38 @@ export default function App() {
 
             {/* UI Overlay (Only when playing) */}
             {phase === 'PLAYING' && mapLoaded && (
-                <>
-                    <Chat />
-                    <VoiceChatManager />
-                    <VoiceIndicator />
-                    <GameStatusHud />
-                    <SpectatorHud />
-                    {!isSettingsOpen && !isPauseMenuOpen && !isPlayerListOpen && (
-                        <MobileControls onOpenMenu={() => setIsPauseMenuOpen(true)} />
-                    )}
-
-                    <InteractionPrompt />
-
-                    {/* Player List Overlay */}
-                    {isPlayerListOpen && <PlayerList />}
-
-                    {/* Pause Menu */}
-                    {isPauseMenuOpen && !isSettingsOpen && (
-                        <PauseMenu
-                            onResume={handleResume}
-                            onOpenSettings={() => setIsSettingsOpen(true)}
-                            onQuit={handleQuit}
-                        />
-                    )}
-                    
-                    {/* Vote Screen */}
+                infectedGameState === 'VOTING' ? (
+                    // During voting, show only the vote UI to keep things clean
                     <VoteScreen />
-                </>
+                ) : (
+                    <>
+                        <Chat />
+                        <VoiceChatManager />
+                        <VoiceIndicator />
+                        <GameStatusHud />
+                        <SpectatorHud />
+                        {!isSettingsOpen && !isPauseMenuOpen && !isPlayerListOpen && (
+                            <MobileControls onOpenMenu={() => setIsPauseMenuOpen(true)} />
+                        )}
+
+                        <InteractionPrompt />
+
+                        {/* Player List Overlay */}
+                        {isPlayerListOpen && <PlayerList />}
+
+                        {/* Pause Menu */}
+                        {isPauseMenuOpen && !isSettingsOpen && (
+                            <PauseMenu
+                                onResume={handleResume}
+                                onOpenSettings={() => setIsSettingsOpen(true)}
+                                onQuit={handleQuit}
+                            />
+                        )}
+                        
+                        {/* Vote Screen */}
+                        <VoteScreen />
+                    </>
+                )
             )}
 
             {/* Death Overlay (on top of everything) */}
