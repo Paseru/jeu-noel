@@ -7,7 +7,6 @@ import { Map } from './World/Map'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import SpectatorController from './components/SpectatorController'
 import { VHSEffect } from './components/VHSEffect'
-import { VolumetricFog } from './components/VolumetricFog'
 
 import { useGameStore } from './stores/useGameStore'
 import RemotePlayer from './Multiplayer/RemotePlayer'
@@ -67,7 +66,6 @@ export const Experience = ({ isSettingsOpen }: { isSettingsOpen: boolean }) => {
                 </Suspense>
             </Physics>
 
-            <VolumetricFog />
             <VHSEffect />
         </>
     )
