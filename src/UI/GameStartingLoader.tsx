@@ -4,11 +4,13 @@ import { useGameStore } from '../stores/useGameStore'
 export default function GameStartingLoader() {
     const currentRoomId = useGameStore((state) => state.currentRoomId)
     const rooms = useGameStore((state) => state.rooms)
-    const isInfected = useGameStore((state) => state.isInfected)
     const startingCountdownEnd = useGameStore((state) => state.startingCountdownEnd)
     const playerId = useGameStore((state) => state.playerId)
     const infectedPlayers = useGameStore((state) => state.infectedPlayers)
     const room = rooms.find(r => r.id === currentRoomId)
+    
+    // Calculate isInfected locally for reliability (store's isInfected may not be updated yet)
+    const isInfected = playerId ? infectedPlayers.includes(playerId) : false
     
     // Debug log
     console.log('[GameStartingLoader] isInfected:', isInfected, 'playerId:', playerId, 'infectedPlayers:', infectedPlayers)
