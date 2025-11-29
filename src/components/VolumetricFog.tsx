@@ -1,150 +1,109 @@
-import { Clouds, Cloud } from '@react-three/drei'
+import { useRef, useMemo } from 'react'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
+const FOG_COUNT = 3000
+const FOG_RANGE_X = 120
+const FOG_RANGE_Z = 120
+const FOG_MIN_Y = -15
+const FOG_MAX_Y = 25
+
 export const VolumetricFog = () => {
-    const fogY = 10 // Spawn height
-    
+    const points = useRef<THREE.Points>(null!)
+
+    const texture = useMemo(() => {
+        const canvas = document.createElement('canvas')
+        canvas.width = 64
+        canvas.height = 64
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+            const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32)
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)')
+            gradient.addColorStop(0.3, 'rgba(240, 240, 245, 0.5)')
+            gradient.addColorStop(0.6, 'rgba(220, 220, 230, 0.2)')
+            gradient.addColorStop(1, 'rgba(200, 200, 210, 0)')
+            ctx.fillStyle = gradient
+            ctx.fillRect(0, 0, 64, 64)
+        }
+        const tex = new THREE.CanvasTexture(canvas)
+        return tex
+    }, [])
+
+    const { positions, velocities, sizes } = useMemo(() => {
+        const pos = new Float32Array(FOG_COUNT * 3)
+        const vel = new Float32Array(FOG_COUNT * 3)
+        const siz = new Float32Array(FOG_COUNT)
+
+        for (let i = 0; i < FOG_COUNT; i++) {
+            pos[i * 3] = (Math.random() - 0.5) * FOG_RANGE_X
+            pos[i * 3 + 1] = FOG_MIN_Y + Math.random() * (FOG_MAX_Y - FOG_MIN_Y)
+            pos[i * 3 + 2] = (Math.random() - 0.5) * FOG_RANGE_Z
+
+            vel[i * 3] = (Math.random() - 0.5) * 0.3
+            vel[i * 3 + 1] = (Math.random() - 0.5) * 0.1
+            vel[i * 3 + 2] = (Math.random() - 0.5) * 0.3
+
+            siz[i] = 8 + Math.random() * 25
+        }
+
+        return { positions: pos, velocities: vel, sizes: siz }
+    }, [])
+
+    useFrame((state) => {
+        if (!points.current) return
+
+        const posAttr = points.current.geometry.getAttribute('position')
+        const time = state.clock.elapsedTime
+
+        for (let i = 0; i < FOG_COUNT; i++) {
+            let x = posAttr.getX(i)
+            let y = posAttr.getY(i)
+            let z = posAttr.getZ(i)
+
+            x += velocities[i * 3] * 0.016 + Math.sin(time * 0.5 + i) * 0.02
+            y += velocities[i * 3 + 1] * 0.016 + Math.sin(time * 0.3 + i * 0.5) * 0.01
+            z += velocities[i * 3 + 2] * 0.016 + Math.cos(time * 0.4 + i) * 0.02
+
+            if (x > FOG_RANGE_X / 2) x = -FOG_RANGE_X / 2
+            if (x < -FOG_RANGE_X / 2) x = FOG_RANGE_X / 2
+            if (z > FOG_RANGE_Z / 2) z = -FOG_RANGE_Z / 2
+            if (z < -FOG_RANGE_Z / 2) z = FOG_RANGE_Z / 2
+            if (y > FOG_MAX_Y) y = FOG_MIN_Y
+            if (y < FOG_MIN_Y) y = FOG_MAX_Y
+
+            posAttr.setXYZ(i, x, y, z)
+        }
+
+        posAttr.needsUpdate = true
+    })
+
     return (
-        <Clouds material={THREE.MeshBasicMaterial} limit={400}>
-            {/* Dense ground layer */}
-            <Cloud
-                seed={1}
-                bounds={[100, 8, 100]}
-                position={[0, fogY - 15, 0]}
-                volume={30}
-                color="#c8c8d0"
-                opacity={0.8}
-                speed={0.15}
-                segments={60}
-                fade={100}
-            />
-            <Cloud
-                seed={10}
-                bounds={[100, 8, 100]}
-                position={[0, fogY - 12, 0]}
-                volume={28}
-                color="#b0b0c0"
-                opacity={0.75}
-                speed={0.12}
-                segments={55}
-                fade={100}
-            />
-            
-            {/* Main fog at spawn level */}
-            <Cloud
-                seed={2}
-                bounds={[120, 12, 120]}
-                position={[0, fogY - 5, 0]}
-                volume={35}
-                color="#d0d0d8"
-                opacity={0.85}
-                speed={0.1}
-                segments={70}
-                fade={120}
-            />
-            <Cloud
-                seed={20}
-                bounds={[110, 10, 110]}
-                position={[0, fogY, 0]}
-                volume={32}
-                color="#e0e0e8"
-                opacity={0.9}
-                speed={0.08}
-                segments={65}
-                fade={110}
-            />
-            <Cloud
-                seed={21}
-                bounds={[100, 8, 100]}
-                position={[0, fogY + 2, 0]}
-                volume={30}
-                color="#d8d8e0"
-                opacity={0.8}
-                speed={0.11}
-                segments={60}
-                fade={100}
-            />
-            
-            {/* Upper fog layers */}
-            <Cloud
-                seed={3}
-                bounds={[100, 10, 100]}
-                position={[0, fogY + 8, 0]}
-                volume={28}
-                color="#c0c0d0"
-                opacity={0.7}
-                speed={0.06}
-                segments={50}
-                fade={90}
-            />
-            <Cloud
-                seed={30}
-                bounds={[90, 8, 90]}
-                position={[0, fogY + 12, 0]}
-                volume={25}
-                color="#b8b8c8"
-                opacity={0.65}
-                speed={0.07}
-                segments={45}
-                fade={85}
-            />
-            <Cloud
-                seed={4}
-                bounds={[80, 6, 80]}
-                position={[0, fogY + 18, 0]}
-                volume={22}
-                color="#a8a8b8"
-                opacity={0.55}
-                speed={0.05}
-                segments={40}
-                fade={80}
-            />
-            
-            {/* Extra thick patches */}
-            <Cloud
-                seed={100}
-                bounds={[60, 15, 60]}
-                position={[-20, fogY, -20]}
-                volume={40}
+        <points ref={points}>
+            <bufferGeometry>
+                <bufferAttribute
+                    attach="attributes-position"
+                    count={FOG_COUNT}
+                    array={positions}
+                    itemSize={3}
+                />
+                <bufferAttribute
+                    attach="attributes-size"
+                    count={FOG_COUNT}
+                    array={sizes}
+                    itemSize={1}
+                />
+            </bufferGeometry>
+            <pointsMaterial
+                size={18}
                 color="#e8e8f0"
-                opacity={0.95}
-                speed={0.09}
-                segments={50}
-                fade={70}
+                transparent
+                opacity={0.35}
+                map={texture}
+                alphaTest={0.01}
+                depthWrite={false}
+                blending={THREE.NormalBlending}
+                sizeAttenuation={true}
             />
-            <Cloud
-                seed={101}
-                bounds={[60, 15, 60]}
-                position={[20, fogY - 3, 20]}
-                volume={38}
-                color="#e0e0e8"
-                opacity={0.9}
-                speed={0.1}
-                segments={50}
-                fade={70}
-            />
-            <Cloud
-                seed={102}
-                bounds={[50, 12, 50]}
-                position={[30, fogY + 5, -30]}
-                volume={35}
-                color="#d8d8e0"
-                opacity={0.85}
-                speed={0.08}
-                segments={45}
-                fade={65}
-            />
-            <Cloud
-                seed={103}
-                bounds={[50, 12, 50]}
-                position={[-30, fogY - 8, 30]}
-                volume={35}
-                color="#d0d0d8"
-                opacity={0.85}
-                speed={0.11}
-                segments={45}
-                fade={65}
-            />
-        </Clouds>
+        </points>
     )
 }
