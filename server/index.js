@@ -87,11 +87,18 @@ const broadcastGameState = (roomId) => {
     
     const roomPlayers = getRoomPlayers(roomId);
     const survivors = getSurvivors(roomId);
+
+    // During STARTING we already know who will be infected, but roomState.infectedPlayers
+    // is intentionally cleared until the game actually starts. We still need to broadcast
+    // the pending infected so clients can show the correct role in the loader.
+    const infectedForBroadcast = roomState.state === 'STARTING'
+        ? [roomState.pendingInfectedId].filter(Boolean)
+        : roomState.infectedPlayers;
     
     io.to(roomId).emit('gameStateUpdate', {
         state: roomState.state,
         countdownEnd: roomState.countdownEnd,
-        infectedPlayers: roomState.infectedPlayers,
+        infectedPlayers: infectedForBroadcast,
         playerCount: roomPlayers.length,
         survivorCount: survivors.length,
         minPlayers: MIN_PLAYERS,
