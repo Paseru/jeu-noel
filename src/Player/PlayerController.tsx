@@ -207,12 +207,12 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
         if (!isInfected || infectedGameState !== 'PLAYING') return
 
         const now = Date.now()
-        if (now - lastAttackTime.current < 500) return // 500ms cooldown
+        if (now - lastAttackTime.current < 1000) return // 1000ms cooldown (1s)
         lastAttackTime.current = now
         
         // Trigger attack animation
         setIsAttacking(true)
-        setTimeout(() => setIsAttacking(false), 500) // Reset after animation
+        setTimeout(() => setIsAttacking(false), 1000) // Reset after animation (1s)
         
         // Trigger camera lunge effect
         isLunging.current = true
@@ -447,18 +447,28 @@ export const PlayerController = ({ isSettingsOpen }: PlayerControllerProps) => {
         // Camera lunge effect for zombie attack
         let lungeOffset = 0
         if (isLunging.current) {
-            attackLungeProgress.current += delta * 8
+            attackLungeProgress.current += delta * 1.0 // Full cycle in 1 second
             
-            if (attackLungeProgress.current < 0.5) {
-                // Forward phase: move camera forward
-                lungeOffset = attackLungeProgress.current * 1.0
-            } else if (attackLungeProgress.current < 1.0) {
-                // Return phase: move camera back
-                lungeOffset = (1.0 - attackLungeProgress.current) * 1.0
+            const p = attackLungeProgress.current
+            
+            if (p < 0.2) {
+                // Wind up: Pull back slightly (-0.2 units)
+                // Smooth step from 0 to -0.2
+                lungeOffset = -0.2 * (p / 0.2)
+            } else if (p < 0.3) {
+                // Strike: Fast forward to +0.5 units
+                // Map 0.2-0.3 to -0.2 -> 0.5
+                const t = (p - 0.2) / 0.1
+                lungeOffset = -0.2 + (0.7 * t)
+            } else if (p < 1.0) {
+                // Recovery: Ease out from 0.5 back to 0
+                const t = (p - 0.3) / 0.7
+                lungeOffset = 0.5 * (1 - t * t) // Quadratic ease out
             } else {
                 // Done
                 isLunging.current = false
                 attackLungeProgress.current = 0
+                lungeOffset = 0
             }
         }
 
